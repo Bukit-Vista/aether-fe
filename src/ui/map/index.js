@@ -86,7 +86,7 @@ module.exports = function (context, readonly) {
     }
   }
 
-  function map() {
+  async function map() {
     mapboxgl.accessToken =
       'pk.eyJ1Ijoic3ZjLW9rdGEtbWFwYm94LXN0YWZmLWFjY2VzcyIsImEiOiJjbG5sMnExa3kxNTJtMmtsODJld24yNGJlIn0.RQ4CHchAYPJQZSiUJ0O3VQ';
 
@@ -428,6 +428,213 @@ module.exports = function (context, readonly) {
       bindPopup(e, context, writable);
     };
 
+    // const airbnbData = {
+    //   airbnb_listings: [
+    //     {
+    //       id: 1001,
+    //       listing_name: 'Luxury Beachfront Villa with Ocean View',
+    //       area_name: 'Nusa Dua',
+    //       roomTypeCategory: 'Entire home',
+    //       reviewsCount: 128,
+    //       Wifi: 1,
+    //       Pool: 1,
+    //       Air_conditioning: 1,
+    //       Kitchen: 1,
+    //       guests: 6,
+    //       bedroom: 3,
+    //       bed: 4,
+    //       review: 4.8,
+    //       accuracy: 4.9,
+    //       checkin: 4.7,
+    //       cleanliness: 4.9,
+    //       communication: 4.8,
+    //       location: 4.9,
+    //       value: 4.7,
+    //       latitude: -8.789012,
+    //       longitude: 115.234567,
+    //       rate: 450.0,
+    //       geometry: 'POINT(115.234567 -8.789012)'
+    //     },
+    //     {
+    //       id: 1002,
+    //       listing_name: 'Modern Studio Apartment in City Center',
+    //       area_name: 'Kuta',
+    //       roomTypeCategory: 'Private room',
+    //       reviewsCount: 85,
+    //       Wifi: 1,
+    //       Pool: 0,
+    //       Air_conditioning: 1,
+    //       Kitchen: 1,
+    //       guests: 2,
+    //       bedroom: 1,
+    //       bed: 1,
+    //       review: 4.6,
+    //       accuracy: 4.7,
+    //       checkin: 4.8,
+    //       cleanliness: 4.7,
+    //       communication: 4.8,
+    //       location: 4.9,
+    //       value: 4.8,
+    //       latitude: -8.723456,
+    //       longitude: 115.178901,
+    //       rate: 120.0,
+    //       geometry: 'POINT(115.178901 -8.723456)'
+    //     },
+    //     {
+    //       id: 1003,
+    //       listing_name: 'Traditional Balinese Villa with Garden',
+    //       area_name: 'Ubud',
+    //       roomTypeCategory: 'Entire home',
+    //       reviewsCount: 156,
+    //       Wifi: 1,
+    //       Pool: 1,
+    //       Air_conditioning: 1,
+    //       Kitchen: 1,
+    //       guests: 4,
+    //       bedroom: 2,
+    //       bed: 2,
+    //       review: 4.9,
+    //       accuracy: 4.9,
+    //       checkin: 4.8,
+    //       cleanliness: 4.9,
+    //       communication: 4.9,
+    //       location: 4.8,
+    //       value: 4.7,
+    //       latitude: -8.512345,
+    //       longitude: 115.26789,
+    //       rate: 280.0,
+    //       geometry: 'POINT(115.267890 -8.512345)'
+    //     },
+    //     {
+    //       id: 1004,
+    //       listing_name: 'Cozy Beach Bungalow',
+    //       area_name: 'Canggu',
+    //       roomTypeCategory: 'Entire home',
+    //       reviewsCount: 92,
+    //       Wifi: 1,
+    //       Pool: 1,
+    //       Air_conditioning: 1,
+    //       Kitchen: 1,
+    //       guests: 3,
+    //       bedroom: 1,
+    //       bed: 2,
+    //       review: 4.7,
+    //       accuracy: 4.8,
+    //       checkin: 4.7,
+    //       cleanliness: 4.8,
+    //       communication: 4.7,
+    //       location: 4.9,
+    //       value: 4.8,
+    //       latitude: -8.645678,
+    //       longitude: 115.123456,
+    //       rate: 150.0,
+    //       geometry: 'POINT(115.123456 -8.645678)'
+    //     },
+    //     {
+    //       id: 1005,
+    //       listing_name: 'Luxury Penthouse with Rooftop Pool',
+    //       area_name: 'Seminyak',
+    //       roomTypeCategory: 'Entire home',
+    //       reviewsCount: 75,
+    //       Wifi: 1,
+    //       Pool: 1,
+    //       Air_conditioning: 1,
+    //       Kitchen: 1,
+    //       guests: 8,
+    //       bedroom: 4,
+    //       bed: 5,
+    //       review: 4.9,
+    //       accuracy: 4.9,
+    //       checkin: 4.9,
+    //       cleanliness: 4.9,
+    //       communication: 4.9,
+    //       location: 4.9,
+    //       value: 4.8,
+    //       latitude: -8.678901,
+    //       longitude: 115.16789,
+    //       rate: 850.0,
+    //       geometry: 'POINT(115.167890 -8.678901)'
+    //     },
+    //     {
+    //       id: 1005,
+    //       listing_name: 'Luxury Penthouse with Rooftop Pool',
+    //       area_name: 'Seminyak',
+    //       roomTypeCategory: 'Entire home',
+    //       reviewsCount: 75,
+    //       Wifi: 1,
+    //       Pool: 1,
+    //       Air_conditioning: 1,
+    //       Kitchen: 1,
+    //       guests: 8,
+    //       bedroom: 4,
+    //       bed: 5,
+    //       review: 4.9,
+    //       accuracy: 4.9,
+    //       checkin: 4.9,
+    //       cleanliness: 4.9,
+    //       communication: 4.9,
+    //       location: 4.9,
+    //       value: 4.8,
+    //       latitude: -8.678909,
+    //       longitude: 115.16789,
+    //       rate: 850.0,
+    //       geometry: 'POINT(115.167890 -8.678901)'
+    //     }
+    //   ]
+    // };
+
+    // Function to generate a polygon from the listing coordinates
+    const getPolygonCoordinates = (longitude, latitude) => {
+      const offset = 0.0003; // Offset to create a small rectangle for the polygon
+      return [
+        [
+          [longitude - offset, latitude - offset],
+          [longitude + offset, latitude - offset],
+          [longitude + offset, latitude + offset],
+          [longitude - offset, latitude + offset],
+          [longitude - offset, latitude - offset]
+        ]
+      ];
+    };
+
+    async function getAirbnbData() {
+      try {
+        const response = await fetch('data/airbnb_listings.json');
+        const data = await response.json();
+        // Gunakan data JSON disini
+        return data;
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    }
+
+    const airbnb = await getAirbnbData();
+
+    // Create GeoJSON data for polygons
+    const geojsonData = {
+      type: 'FeatureCollection',
+      features: airbnb.map((listing) => ({
+        type: 'Feature',
+        geometry: {
+          type: 'Polygon', // Use 'Polygon' instead of 'Point'
+          coordinates: getPolygonCoordinates(
+            listing.longitude,
+            listing.latitude
+          )
+        },
+        properties: {
+          listing_name: listing.listing_name,
+          airbnbUrl: `https://www.airbnb.com/rooms/${listing.id}`,
+          height: listing.reviewsCount, // Example height, you can customize this
+          area_name: listing.area_name,
+          roomTypeCategory: listing.roomTypeCategory,
+          rate: listing.rate,
+          review: listing.review,
+          reviewsCount: listing.reviewsCount
+        }
+      }))
+    };
+
     context.map.on('load', () => {
       context.data.set({
         mapStyleLoaded: true
@@ -449,6 +656,167 @@ module.exports = function (context, readonly) {
         'map-data-line',
         handleLinestringOrPolygonClick
       );
+      context.map.addSource('3d-chart-data', {
+        type: 'geojson',
+        data: geojsonData
+      });
+
+      context.map.addLayer({
+        id: '3d-chart-layer',
+        type: 'fill-extrusion',
+        source: '3d-chart-data',
+        paint: {
+          'fill-extrusion-color': [
+            'interpolate',
+            ['linear'],
+            ['get', 'review'],
+            4,
+            '#ff0000',
+            4.5,
+            '#ffa500',
+            5,
+            '#008000'
+          ],
+          'fill-extrusion-height': [
+            'coalesce',
+            ['*', ['get', 'reviewsCount'], 10], // Kalikan 'reviewsCount' dengan 10
+            1 // Jika tidak ada 'reviewsCount', gunakan nilai default 1
+          ],
+          'fill-extrusion-opacity': 0.8,
+          'fill-extrusion-vertical-gradient': true
+        }
+      });
+    });
+
+    const tooltip = document.createElement('div');
+    tooltip.className = 'map-tooltip';
+    tooltip.style.position = 'absolute';
+    tooltip.style.backgroundColor = 'white';
+    tooltip.style.color = 'black';
+    tooltip.style.padding = '15px';
+    tooltip.style.borderRadius = '10px';
+    tooltip.style.display = 'none';
+    tooltip.style.maxWidth = '250px'; // Adjusted max width
+    tooltip.style.wordWrap = 'break-word'; // Wrap long text
+    tooltip.style.boxShadow = '0px 4px 6px rgba(0, 0, 0, 0.1)'; // Subtle shadow
+    tooltip.style.fontFamily = 'Arial, sans-serif'; // Font for better readability
+    document.body.appendChild(tooltip);
+
+    // Add hover interactivity
+    let hoveredFeatureId = null; // Track the current hovered feature
+
+    context.map.on('mousemove', '3d-chart-layer', (e) => {
+      const features = context.map.queryRenderedFeatures(e.point, {
+        layers: ['3d-chart-layer']
+      });
+
+      if (features.length > 0) {
+        const feature = features[0];
+        if (hoveredFeatureId !== feature.id) {
+          // Hide the previous tooltip
+          tooltip.style.display = 'none';
+
+          // Update the hovered feature id
+          hoveredFeatureId = feature.id;
+
+          // Build the tooltip content
+          const listingName = feature.properties.listing_name;
+          const rating = feature.properties.review || 0;
+          const totalReview = feature.properties.reviewsCount || 0;
+          const price = feature.properties.rate;
+          const propertyType = feature.properties.property_type;
+          const areaName = feature.properties.area_name;
+
+          tooltip.innerHTML = `
+        <div style="font-size: 16px; font-weight: bold; color: #333;">${listingName}</div>
+        <div style="font-size: 14px; color: #555;">⭐ Rating: ${rating} (${totalReview} reviews)</div>
+        <div style="font-size: 14px; color: #555;">💰 Price: $${price}/night</div>
+        <div style="font-size: 14px; color: #555;">🏡 Type: ${propertyType}</div>
+        <div style="font-size: 14px; color: #555;">📍 Area: ${areaName}</div>
+      `;
+
+          // Show the tooltip
+          tooltip.style.display = 'block';
+
+          // Set tooltip position (adjust to avoid going off-screen)
+          const tooltipWidth = tooltip.offsetWidth;
+          const tooltipHeight = tooltip.offsetHeight;
+          let tooltipX = e.originalEvent.pageX + 10;
+          let tooltipY = e.originalEvent.pageY + 10;
+
+          // Adjust position if it goes off the screen
+          if (tooltipX + tooltipWidth > window.innerWidth) {
+            tooltipX = window.innerWidth - tooltipWidth - 10;
+          }
+          if (tooltipY + tooltipHeight > window.innerHeight) {
+            tooltipY = window.innerHeight - tooltipHeight - 10;
+          }
+
+          tooltip.style.left = `${tooltipX}px`;
+          tooltip.style.top = `${tooltipY}px`;
+        }
+      } else {
+        // Hide tooltip when mouse is not over the layer
+        tooltip.style.display = 'none';
+        hoveredFeatureId = null;
+      }
+    });
+
+    context.map.on('mouseleave', '3d-chart-layer', () => {
+      // Hide the tooltip when mouse leaves the layer
+      tooltip.style.display = 'none';
+      hoveredFeatureId = null;
+    });
+
+    // Add click interactivity
+    context.map.on('click', '3d-chart-layer', (e) => {
+      const features = context.map.queryRenderedFeatures(e.point, {
+        layers: ['3d-chart-layer']
+      });
+
+      if (features.length > 0) {
+        const feature = features[0];
+        const airbnbUrl = feature.properties.airbnbUrl;
+
+        if (airbnbUrl) {
+          // Redirect to Airbnb link
+          window.open(airbnbUrl, '_blank');
+        }
+      }
+    });
+
+    context.map.on('style.load', () => {
+      // Tambahkan ulang sumber data chart
+      context.map.addSource('3d-chart-data', {
+        type: 'geojson',
+        data: geojsonData
+      });
+
+      context.map.addLayer({
+        id: '3d-chart-layer',
+        type: 'fill-extrusion',
+        source: '3d-chart-data',
+        paint: {
+          'fill-extrusion-color': [
+            'interpolate',
+            ['linear'],
+            ['get', 'review'],
+            4,
+            '#ff0000',
+            4.5,
+            '#ffa500',
+            5,
+            '#008000'
+          ],
+          'fill-extrusion-height': [
+            'coalesce',
+            ['*', ['get', 'reviewsCount'], 10], // Kalikan 'reviewsCount' dengan 10
+            1 // Jika tidak ada 'reviewsCount', gunakan nilai default 1
+          ],
+          'fill-extrusion-opacity': 0.8,
+          'fill-extrusion-vertical-gradient': true
+        }
+      });
     });
 
     context.map.on('draw.create', created);

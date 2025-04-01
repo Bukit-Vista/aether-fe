@@ -9,8 +9,7 @@ const shpwrite = require('shp-write'),
 
 const flash = require('./flash'),
   zoomextent = require('../lib/zoomextent'),
-  readFile = require('../lib/readfile'),
-  meta = require('../lib/meta.js');
+  readFile = require('../lib/readfile');
 
 /**
  * This module provides the file picking & status bar above the map interface.
@@ -51,124 +50,7 @@ module.exports = function fileBar(context) {
   }
 
   function bar(selection) {
-    const actions = [
-      {
-        title: 'Open',
-        alt: 'CSV, GTFS, KML, GPX, and other filetypes',
-        action: blindImport
-      },
-      {
-        title: 'Save',
-        children: exportFormats
-      },
-      {
-        title: 'New',
-        action: function () {
-          window.open(
-            window.location.origin + window.location.pathname + '#new'
-          );
-        }
-      },
-      {
-        title: 'Meta',
-        action: function () {},
-        children: [
-          {
-            title: 'Add raster tile layer',
-            alt: 'Add a custom tile layer',
-            action: function () {
-              const layerURL = prompt(
-                'Layer URL\ne.g. https://stamen-tiles-b.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg'
-              );
-              if (layerURL === null) return;
-              const layerName = prompt('Layer name');
-              if (layerName === null) return;
-              meta.adduserlayer(context, layerURL, layerName);
-            }
-          },
-          {
-            title: 'Zoom to features',
-            alt: 'Zoom to the extent of all features',
-            action: function () {
-              meta.zoomextent(context);
-            }
-          },
-          {
-            title: 'Clear',
-            alt: 'Delete all features from the map',
-            action: function () {
-              if (
-                confirm(
-                  'Are you sure you want to delete all features from this map?'
-                )
-              ) {
-                meta.clear(context);
-              }
-            }
-          },
-          {
-            title: 'Random: Points',
-            alt: 'Add random points to your map',
-            action: function () {
-              const response = prompt('Number of points (default: 100)');
-              if (response === null) return;
-              let count = parseInt(response, 10);
-              if (isNaN(count)) count = 100;
-              meta.random(context, count, 'point');
-            }
-          },
-          {
-            title: 'Add bboxes',
-            alt: 'Add bounding box members to all applicable GeoJSON objects',
-            action: function () {
-              meta.bboxify(context);
-            }
-          },
-          {
-            title: 'Flatten Multi Features',
-            alt: 'Flatten MultiPolygons, MultiLines, and GeometryCollections into simple geometries',
-            action: function () {
-              meta.flatten(context);
-            }
-          },
-          {
-            title: 'Load encoded polyline (precision 5)',
-            alt: 'Decode and show an encoded precision 5 polyline.',
-            action: function () {
-              meta.polyline(context);
-            }
-          },
-          {
-            title: 'Load encoded polyline (precision 6)',
-            alt: 'Decode and show an encoded precision 6 polyline.',
-            action: function () {
-              meta.polyline6(context);
-            }
-          },
-          {
-            title: 'Load WKB Base64 Encoded String',
-            alt: 'Decode and show WKX data',
-            action: function () {
-              meta.wkxBase64(context);
-            }
-          },
-          {
-            title: 'Load WKB Hex Encoded String',
-            alt: 'Decode and show WKX data',
-            action: function () {
-              meta.wkxHex(context);
-            }
-          },
-          {
-            title: 'Load WKT String',
-            alt: 'Decode and show WKX data',
-            action: function () {
-              meta.wkxString(context);
-            }
-          }
-        ]
-      }
-    ];
+    const actions = [];
 
     const items = selection
       .append('div')

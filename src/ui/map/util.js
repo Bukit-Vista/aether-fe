@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 const mapboxgl = require('mapbox-gl');
 const escape = require('escape-html');
 const length = require('@turf/length').default;
@@ -310,7 +311,6 @@ function bindPopup(e, context, writable) {
   }
 
   if (feature && feature.geometry) {
-    info += '<table class="metadata">';
     if (feature.geometry.type === 'LineString') {
       const total = length(feature) * 1000;
       info +=
@@ -355,18 +355,15 @@ function bindPopup(e, context, writable) {
         (area(feature.geometry) / 2589990).toFixed(2) +
         '</td></tr>';
     }
-    info += '</table>';
   }
 
   // don't show the add simplestyle properties button if the feature already contains simplestyle properties
-  let showAddStyleButton = true;
-
   if (
     feature.geometry.type === 'Point' ||
     feature.geometry.type === 'MultiPoint'
   ) {
     if ('marker-color' in properties && 'marker-size' in properties) {
-      showAddStyleButton = false;
+      // ... existing code ...
     }
   }
 
@@ -379,7 +376,7 @@ function bindPopup(e, context, writable) {
       'stroke-width' in properties &&
       'stroke-opacity' in properties
     ) {
-      showAddStyleButton = false;
+      // ... existing code ...
     }
   }
 
@@ -387,7 +384,6 @@ function bindPopup(e, context, writable) {
     feature.geometry.type === 'Polygon' ||
     feature.geometry.type === 'MultiPolygon'
   ) {
-    showAddStyleButton = true;
     if (
       'stroke' in properties &&
       'stroke-width' in properties &&
@@ -395,41 +391,12 @@ function bindPopup(e, context, writable) {
       'fill' in properties &&
       'fill-opacity' in properties
     ) {
-      showAddStyleButton = false;
+      // ... existing code ...
     }
   }
 
-  const tabs =
-    '<div class="pad1 tabs-ui clearfix col12">' +
-    '<div class="tab col12">' +
-    '<input class="hide" type="radio" id="properties" name="tab-group" checked="true">' +
-    '<label class="keyline-top keyline-right tab-toggle pad0 pin-bottomleft z10 center col6" for="properties">Properties</label>' +
-    '<div class="space-bottom1 col12 content">' +
-    '<table class="space-bottom0 marker-properties">' +
-    table +
-    '</table>' +
-    (writable
-      ? '<div class="add-row-button add fl col4"><span class="fa-solid fa-plus"></span> Add row</div>'
-      : '') +
-    (writable && showAddStyleButton
-      ? '<div class="add-simplestyle-properties-button fl text-right col8">Add simplestyle properties</div>'
-      : '') +
-    '</div>' +
-    '</div>' +
-    '<div class="space-bottom2 tab col12">' +
-    '<input class="hide" type="radio" id="info" name="tab-group">' +
-    '<label class="keyline-top tab-toggle pad0 pin-bottomright z10 center col6" for="info">Info</label>' +
-    '<div class="space-bottom1 col12 content">' +
-    '<div class="marker-info">' +
-    info +
-    ' </div>' +
-    '</div>' +
-    '</div>' +
-    '</div>';
-
   const content =
     '<form action="javascript:void(0);">' +
-    tabs +
     (writable
       ? '<div class="clearfix col12 pad1 keyline-top">' +
         '<div class="pill col6">' +

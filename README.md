@@ -1,20 +1,3 @@
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bhttps%3A%2F%2Fgithub.com%2Fmapbox%2Fgeojson.io.svg?type=shield)](https://app.fossa.io/projects/git%2Bhttps%3A%2F%2Fgithub.com%2Fmapbox%2Fgeojson.io?ref=badge_shield)
-
-# geojson.io
-
-![](http://i.cloudup.com/kz3BAF7Hnx.png)
-
-A fast, simple editor for map data. Read more on [Mapbox](https://www.mapbox.com/blog/geojsonio-announce/),
-[macwright.org](https://macwright.org/2013/07/26/geojsonio.html).
-
-## Goes Great With!
-
-**Tools**
-
-- [Using geojson.io with GitHub is better with the Chrome Extension](https://chrome.google.com/webstore/detail/geojsonio/oibjgofbhldcajfamjganpeacipebckp)
-- [geojsonio-cli](https://github.com/mapbox/geojsonio-cli) lets you shoot geojson from your terminal to geojson.io! (with nodejs)
-- [geojsonio.py](https://github.com/jwass/geojsonio.py) lets you shoot geojson from your terminal to geojson.io! (with python)
-
 ## API
 
 You can interact with geojson.io programmatically via URL parameters. Here is an example of geojson encoded into the URL:
@@ -38,7 +21,3 @@ Full API documentation can be found in [API.md](API.md).
 `npm run build` will create minified bundles in `/dist`. You can try out the production build with `npm run serve` which will run live-server.
 
 To deploy to github pages, use `npm run deploy`.  This will run the deploy script in `deploy.sh`, which creates a new orphan branch from the current branch, runs a production build, and force pushes to the `gh-pages` branch.
-
-## License
-
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bhttps%3A%2F%2Fgithub.com%2Fmapbox%2Fgeojson.io.svg?type=large)](https://app.fossa.io/projects/git%2Bhttps%3A%2F%2Fgithub.com%2Fmapbox%2Fgeojson.io?ref=badge_large)
