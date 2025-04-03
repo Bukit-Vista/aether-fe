@@ -1,32 +1,39 @@
 <!DOCTYPE html>
 <html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <link href="dist/bundle.css" rel="stylesheet" />
 
-<head>
-  <meta charset="utf-8" />
-  <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-  <link href='dist/bundle.css' rel='stylesheet' />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700;800&display=swap"
+      rel="stylesheet"
+    />
 
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700;800&display=swap" rel="stylesheet" />
+    <title>Aether</title>
 
-  <title>Aether</title>
+    <link rel="icon" type="image/x-icon" href="/img/favicon.png" />
+    <meta name="author" content="Mapbox" />
+    <meta name="description" content="Aether" />
+    <meta property="og:site_name" content="geojson.io" />
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1" />
 
-  <link rel="icon" type="image/x-icon" href="/img/favicon.png" />
-  <meta name="author" content="Mapbox" />
-  <meta name="description" content="Aether" />
-  <meta property="og:site_name" content="geojson.io" />
-  <meta name="viewport" content="initial-scale=1,maximum-scale=1" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:site" content="@mapbox" />
+    <meta name="twitter:creator" content="@mapbox" />
+    <meta property="og:url" content="https://geojson.io" />
+    <meta property="og:title" content="geojson.io | powered by Mapbox" />
+    <meta
+      property="og:description"
+      content="A quick, simple tool for creating, viewing, and sharing spatial data."
+    />
+    <meta property="og:image" content="/img/twitter-card-image.png" />
 
-  <meta name="twitter:card" content="summary" />
-  <meta name="twitter:site" content="@mapbox" />
-  <meta name="twitter:creator" content="@mapbox" />
-  <meta property="og:url" content="https://geojson.io" />
-  <meta property="og:title" content="geojson.io | powered by Mapbox" />
-  <meta property="og:description" content="A quick, simple tool for creating, viewing, and sharing spatial data." />
-  <meta property="og:image" content="/img/twitter-card-image.png" />
-
-  <meta http-equiv="Content-Security-Policy" content="
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="
     default-src
       'self'
       ;
@@ -66,30 +73,27 @@
       'self'
       'unsafe-inline'
       ;
-  ">
-  <!-- Add segment tracking for tool usage -->
-  <script src="https://docs.mapbox.com/analytics.min.js"></script>
-  <style>
-    /*
+  "
+    />
+    <style>
+      /*
    * http://seclab.stanford.edu/websec/framebusting/framebust.pdf
    */
-    body {
-      display: none;
-    }
-  </style>
-</head>
+      body {
+        display: none;
+      }
+    </style>
+  </head>
 
-<body id="geojsonio-body" class="h-full">
-  <div class="geojsonio flex flex-col h-full">
-  </div>
-  <script>
-    if (self == top) {
-      document.getElementsByTagName("body")[0].style.display = "block";
-    } else {
-      top.location = self.location;
-    }
-  </script>
-  <script src="dist/bundle.js"></script>
-</body>
-
+  <body id="geojsonio-body" class="h-full">
+    <div class="geojsonio flex flex-col h-full"></div>
+    <script>
+      if (self == top) {
+        document.getElementsByTagName('body')[0].style.display = 'block';
+      } else {
+        top.location = self.location;
+      }
+    </script>
+    <script src="dist/bundle.js"></script>
+  </body>
 </html>

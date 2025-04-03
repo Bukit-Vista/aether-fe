@@ -42,10 +42,8 @@ const dummyGeojson = {
 module.exports = function (context, readonly) {
   writable = !readonly;
 
-  // keyboard shortcuts
   const keybinding = d3
     .keybinding('map')
-    // delete key triggers draw.trash()
     .on('⌫', () => {
       if (editing) {
         context.Draw.trash();
@@ -80,15 +78,13 @@ module.exports = function (context, readonly) {
   d3.select(document).call(keybinding);
 
   function maybeShowEditControl() {
-    // if there are features, show the edit button
     if (context.data.hasFeatures()) {
       d3.select('.edit-control').style('display', 'block');
     }
   }
 
   async function map() {
-    mapboxgl.accessToken =
-      'pk.eyJ1Ijoic3ZjLW9rdGEtbWFwYm94LXN0YWZmLWFjY2VzcyIsImEiOiJjbG5sMnExa3kxNTJtMmtsODJld24yNGJlIn0.RQ4CHchAYPJQZSiUJ0O3VQ';
+    mapboxgl.accessToken = process.env.MAPBOX_ACCESS_TOKEN;
 
     mapboxgl.setRTLTextPlugin(
       'https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-rtl-text/v0.2.3/mapbox-gl-rtl-text.js',
@@ -99,7 +95,6 @@ module.exports = function (context, readonly) {
     const projection = context.storage.get('projection') || DEFAULT_PROJECTION;
     let activeStyle = context.storage.get('style') || DEFAULT_STYLE;
 
-    // handle previous users who had Streets selected
     if (activeStyle === 'Streets') {
       activeStyle = 'Standard';
     }
@@ -109,7 +104,7 @@ module.exports = function (context, readonly) {
     context.map = new mapboxgl.Map({
       container: 'map',
       style,
-      center: [20, 0],
+      center: [117.27, 0],
       zoom: 2,
       projection,
       hash: 'map'
@@ -209,7 +204,6 @@ module.exports = function (context, readonly) {
 
       const exitEditMode = () => {
         editing = false;
-        // show the data layers
         context.map.setLayoutProperty('map-data-fill', 'visibility', 'visible');
         context.map.setLayoutProperty(
           'map-data-fill-outline',
@@ -218,18 +212,14 @@ module.exports = function (context, readonly) {
         );
         context.map.setLayoutProperty('map-data-line', 'visibility', 'visible');
 
-        // show markers
         d3.selectAll('.mapboxgl-marker').style('display', 'block');
 
-        // clean up draw
         context.Draw.changeMode('simple_select');
         context.Draw.deleteAll();
 
-        // hide the save/cancel control and the delete control
         d3.select('.save-cancel-control').style('display', 'none');
         d3.select('.trash-control').style('display', 'none');
 
-        // show the edit button and draw tools
         maybeShowEditControl();
         d3.select('.mapboxgl-ctrl-group:nth-child(3)').style(
           'display',
@@ -237,7 +227,6 @@ module.exports = function (context, readonly) {
         );
       };
 
-      // handle save or cancel from edit mode
       d3.selectAll('.mapboxgl-draw-actions-btn').on('click', function () {
         const target = d3.select(this);
         const isSaveButton = target.classed('mapboxgl-draw-actions-btn_save');
@@ -257,23 +246,18 @@ module.exports = function (context, readonly) {
         exitEditMode();
       });
 
-      // handle delete
       d3.select('.mapbox-gl-draw_trash').on('click', () => {
         context.Draw.trash();
       });
 
-      // enter edit mode
       d3.selectAll('.mapbox-gl-draw_edit').on('click', () => {
         editing = true;
-        // hide the edit button and draw tools
         d3.select('.edit-control').style('display', 'none');
         d3.select('.mapboxgl-ctrl-group:nth-child(3)').style('display', 'none');
 
-        // show the save/cancel control and the delete control
         d3.select('.save-cancel-control').style('display', 'block');
         d3.select('.trash-control').style('display', 'block');
 
-        // hide the line and polygon data layers
         context.map.setLayoutProperty('map-data-fill', 'visibility', 'none');
         context.map.setLayoutProperty(
           'map-data-fill-outline',
@@ -282,10 +266,8 @@ module.exports = function (context, readonly) {
         );
         context.map.setLayoutProperty('map-data-line', 'visibility', 'none');
 
-        // hide markers
         d3.selectAll('.mapboxgl-marker').style('display', 'none');
 
-        // import the current data into draw for editing
         const featureIds = context.Draw.add(context.data.get('map'));
         context.Draw.changeMode('simple_select', {
           featureIds
@@ -300,19 +282,16 @@ module.exports = function (context, readonly) {
       ) {
         const { name } = context.map.getStyle();
 
-        let color = DEFAULT_DARK_FEATURE_COLOR; // Sets default dark color for lighter base maps
+        let color = DEFAULT_DARK_FEATURE_COLOR;
 
-        // Sets a light color for dark base map
         if (['Mapbox Dark'].includes(name)) {
           color = DEFAULT_LIGHT_FEATURE_COLOR;
         }
 
-        // Sets a brighter color for the satellite base map to help with visibility.
         if (['Mapbox Satellite Streets'].includes(name)) {
           color = DEFAULT_SATELLITE_FEATURE_COLOR;
         }
 
-        // setFog only on Light and Dark
         if (['Mapbox Light', 'Mapbox Dark', 'osm'].includes(name)) {
           context.map.setFog({
             range: [0.5, 10],
@@ -396,7 +375,6 @@ module.exports = function (context, readonly) {
       }
     });
 
-    // only show projection toggle on zoom < 6
     context.map.on('zoomend', () => {
       const zoom = context.map.getZoom();
       if (zoom < 6) {
@@ -419,173 +397,15 @@ module.exports = function (context, readonly) {
     };
 
     const handleLinestringOrPolygonClick = (e) => {
-      // prevent this popup from opening when the original click was on a marker
       const el = e.originalEvent.target;
       if (el.nodeName !== 'CANVAS') return;
-      // prevent this popup from opening when drawing new features
       if (drawing) return;
 
       bindPopup(e, context, writable);
     };
 
-    // const airbnbData = {
-    //   airbnb_listings: [
-    //     {
-    //       id: 1001,
-    //       listing_name: 'Luxury Beachfront Villa with Ocean View',
-    //       area_name: 'Nusa Dua',
-    //       roomTypeCategory: 'Entire home',
-    //       reviewsCount: 128,
-    //       Wifi: 1,
-    //       Pool: 1,
-    //       Air_conditioning: 1,
-    //       Kitchen: 1,
-    //       guests: 6,
-    //       bedroom: 3,
-    //       bed: 4,
-    //       review: 4.8,
-    //       accuracy: 4.9,
-    //       checkin: 4.7,
-    //       cleanliness: 4.9,
-    //       communication: 4.8,
-    //       location: 4.9,
-    //       value: 4.7,
-    //       latitude: -8.789012,
-    //       longitude: 115.234567,
-    //       rate: 450.0,
-    //       geometry: 'POINT(115.234567 -8.789012)'
-    //     },
-    //     {
-    //       id: 1002,
-    //       listing_name: 'Modern Studio Apartment in City Center',
-    //       area_name: 'Kuta',
-    //       roomTypeCategory: 'Private room',
-    //       reviewsCount: 85,
-    //       Wifi: 1,
-    //       Pool: 0,
-    //       Air_conditioning: 1,
-    //       Kitchen: 1,
-    //       guests: 2,
-    //       bedroom: 1,
-    //       bed: 1,
-    //       review: 4.6,
-    //       accuracy: 4.7,
-    //       checkin: 4.8,
-    //       cleanliness: 4.7,
-    //       communication: 4.8,
-    //       location: 4.9,
-    //       value: 4.8,
-    //       latitude: -8.723456,
-    //       longitude: 115.178901,
-    //       rate: 120.0,
-    //       geometry: 'POINT(115.178901 -8.723456)'
-    //     },
-    //     {
-    //       id: 1003,
-    //       listing_name: 'Traditional Balinese Villa with Garden',
-    //       area_name: 'Ubud',
-    //       roomTypeCategory: 'Entire home',
-    //       reviewsCount: 156,
-    //       Wifi: 1,
-    //       Pool: 1,
-    //       Air_conditioning: 1,
-    //       Kitchen: 1,
-    //       guests: 4,
-    //       bedroom: 2,
-    //       bed: 2,
-    //       review: 4.9,
-    //       accuracy: 4.9,
-    //       checkin: 4.8,
-    //       cleanliness: 4.9,
-    //       communication: 4.9,
-    //       location: 4.8,
-    //       value: 4.7,
-    //       latitude: -8.512345,
-    //       longitude: 115.26789,
-    //       rate: 280.0,
-    //       geometry: 'POINT(115.267890 -8.512345)'
-    //     },
-    //     {
-    //       id: 1004,
-    //       listing_name: 'Cozy Beach Bungalow',
-    //       area_name: 'Canggu',
-    //       roomTypeCategory: 'Entire home',
-    //       reviewsCount: 92,
-    //       Wifi: 1,
-    //       Pool: 1,
-    //       Air_conditioning: 1,
-    //       Kitchen: 1,
-    //       guests: 3,
-    //       bedroom: 1,
-    //       bed: 2,
-    //       review: 4.7,
-    //       accuracy: 4.8,
-    //       checkin: 4.7,
-    //       cleanliness: 4.8,
-    //       communication: 4.7,
-    //       location: 4.9,
-    //       value: 4.8,
-    //       latitude: -8.645678,
-    //       longitude: 115.123456,
-    //       rate: 150.0,
-    //       geometry: 'POINT(115.123456 -8.645678)'
-    //     },
-    //     {
-    //       id: 1005,
-    //       listing_name: 'Luxury Penthouse with Rooftop Pool',
-    //       area_name: 'Seminyak',
-    //       roomTypeCategory: 'Entire home',
-    //       reviewsCount: 75,
-    //       Wifi: 1,
-    //       Pool: 1,
-    //       Air_conditioning: 1,
-    //       Kitchen: 1,
-    //       guests: 8,
-    //       bedroom: 4,
-    //       bed: 5,
-    //       review: 4.9,
-    //       accuracy: 4.9,
-    //       checkin: 4.9,
-    //       cleanliness: 4.9,
-    //       communication: 4.9,
-    //       location: 4.9,
-    //       value: 4.8,
-    //       latitude: -8.678901,
-    //       longitude: 115.16789,
-    //       rate: 850.0,
-    //       geometry: 'POINT(115.167890 -8.678901)'
-    //     },
-    //     {
-    //       id: 1005,
-    //       listing_name: 'Luxury Penthouse with Rooftop Pool',
-    //       area_name: 'Seminyak',
-    //       roomTypeCategory: 'Entire home',
-    //       reviewsCount: 75,
-    //       Wifi: 1,
-    //       Pool: 1,
-    //       Air_conditioning: 1,
-    //       Kitchen: 1,
-    //       guests: 8,
-    //       bedroom: 4,
-    //       bed: 5,
-    //       review: 4.9,
-    //       accuracy: 4.9,
-    //       checkin: 4.9,
-    //       cleanliness: 4.9,
-    //       communication: 4.9,
-    //       location: 4.9,
-    //       value: 4.8,
-    //       latitude: -8.678909,
-    //       longitude: 115.16789,
-    //       rate: 850.0,
-    //       geometry: 'POINT(115.167890 -8.678901)'
-    //     }
-    //   ]
-    // };
-
-    // Function to generate a polygon from the listing coordinates
     const getPolygonCoordinates = (longitude, latitude) => {
-      const offset = 0.0003; // Offset to create a small rectangle for the polygon
+      const offset = 0.0003;
       return [
         [
           [longitude - offset, latitude - offset],
@@ -597,26 +417,138 @@ module.exports = function (context, readonly) {
       ];
     };
 
-    async function getAirbnbData() {
+    const loadingBar = document.createElement('div');
+    loadingBar.className = 'loading-bar';
+    loadingBar.style.cssText = `
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-100%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 9999;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    `;
+
+    const spinner = document.createElement('div');
+    spinner.style.cssText = `
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 0.8s linear infinite;
+    `;
+
+    const loadingText = document.createElement('span');
+    loadingText.textContent = 'Loading data...';
+    loadingText.style.cssText = `
+      color: white;
+      font-weight: 500;
+    `;
+
+    const loadingStyle = document.createElement('style');
+    loadingStyle.textContent = `
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    `;
+    document.head.appendChild(loadingStyle);
+
+    loadingBar.appendChild(spinner);
+    loadingBar.appendChild(loadingText);
+    document.body.appendChild(loadingBar);
+
+    const showLoading = () => {
+      loadingBar.style.transform = 'translateX(-50%) translateY(0)';
+      loadingBar.style.opacity = '1';
+    };
+
+    const hideLoading = () => {
+      loadingBar.style.transform = 'translateX(-50%) translateY(-100%)';
+      loadingBar.style.opacity = '0';
+    };
+
+    // eslint-disable-next-line no-unused-vars
+    async function getAirbnbData(zoom = null, lat = null, lng = null) {
       try {
-        const response = await fetch('data/airbnb_listings.json');
+        showLoading();
+
+        const response = await fetch(
+          `${process.env.API_BASE_URL}/database-service/queries?fn=execute_query`,
+          {
+            method: 'POST',
+            headers: {
+              'user-id': process.env.USER_ID,
+              token: process.env.API_TOKEN,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              database: 'data_warehouse',
+              payload: {
+                table: 'airbnb_listings',
+                attributes: [
+                  'id',
+                  'listing_name',
+                  'area_name',
+                  'roomTypeCategory',
+                  'reviewsCount',
+                  'bedroom',
+                  'bed',
+                  'review',
+                  'latitude',
+                  'longitude',
+                  'rate',
+                  'shortest_beach_distance_km',
+                  `6371 * 2 * ASIN(SQRT(POWER(SIN((latitude - ${lat}) * PI() / 180 / 2), 2) + COS(latitude * PI() / 180) * COS(${lat} * PI() / 180) * POWER(SIN((longitude - ${lng}) * PI() / 180 / 2), 2))) AS distance_km`
+                ],
+                associations: [],
+                filters: [],
+                order_by: 'distance_km ASC',
+                limit: 10000,
+                offset: 0
+              }
+            })
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
         const data = await response.json();
-        // Gunakan data JSON disini
-        return data;
+        console.log(data.data);
+        return data.data || [];
       } catch (error) {
         console.error('Error:', error);
+        return [];
+      } finally {
+        hideLoading();
       }
     }
 
-    const airbnb = await getAirbnbData();
+    const airbnb = await getAirbnbData(
+      0,
+      context.map.getCenter().lat,
+      context.map.getCenter().lng
+    );
 
-    // Create GeoJSON data for polygons
     const geojsonData = {
       type: 'FeatureCollection',
       features: airbnb.map((listing) => ({
         type: 'Feature',
         geometry: {
-          type: 'Polygon', // Use 'Polygon' instead of 'Point'
+          type: 'Polygon',
           coordinates: getPolygonCoordinates(
             listing.longitude,
             listing.latitude
@@ -625,7 +557,7 @@ module.exports = function (context, readonly) {
         properties: {
           listing_name: listing.listing_name,
           airbnbUrl: `https://www.airbnb.com/rooms/${listing.id}`,
-          height: listing.reviewsCount, // Example height, you can customize this
+          height: listing.reviewsCount,
           area_name: listing.area_name,
           roomTypeCategory: listing.roomTypeCategory,
           rate: listing.rate,
@@ -634,6 +566,53 @@ module.exports = function (context, readonly) {
         }
       }))
     };
+
+    function setup3DChart(data) {
+      if (!context.map.loaded()) {
+        context.map.on('load', () => setup3DChart(data));
+        return;
+      }
+
+      if (context.map.getSource('3d-chart-data')) {
+        if (context.map.getLayer('3d-chart-layer')) {
+          context.map.removeLayer('3d-chart-layer');
+        }
+        context.map.removeSource('3d-chart-data');
+      }
+
+      context.map.addSource('3d-chart-data', {
+        type: 'geojson',
+        data: data
+      });
+
+      context.map.addLayer({
+        id: '3d-chart-layer',
+        type: 'fill-extrusion',
+        source: '3d-chart-data',
+        paint: {
+          'fill-extrusion-color': [
+            'interpolate',
+            ['linear'],
+            ['get', 'review'],
+            4,
+            '#ff0000',
+            4.5,
+            '#ffa500',
+            5,
+            '#008000'
+          ],
+          'fill-extrusion-height': [
+            'coalesce',
+            ['*', ['get', 'reviewsCount'], 10],
+            1
+          ],
+          'fill-extrusion-opacity': 0.8,
+          'fill-extrusion-vertical-gradient': true
+        }
+      });
+    }
+
+    setup3DChart(geojsonData);
 
     context.map.on('load', () => {
       context.data.set({
@@ -656,36 +635,6 @@ module.exports = function (context, readonly) {
         'map-data-line',
         handleLinestringOrPolygonClick
       );
-      context.map.addSource('3d-chart-data', {
-        type: 'geojson',
-        data: geojsonData
-      });
-
-      context.map.addLayer({
-        id: '3d-chart-layer',
-        type: 'fill-extrusion',
-        source: '3d-chart-data',
-        paint: {
-          'fill-extrusion-color': [
-            'interpolate',
-            ['linear'],
-            ['get', 'review'],
-            4,
-            '#ff0000',
-            4.5,
-            '#ffa500',
-            5,
-            '#008000'
-          ],
-          'fill-extrusion-height': [
-            'coalesce',
-            ['*', ['get', 'reviewsCount'], 10], // Kalikan 'reviewsCount' dengan 10
-            1 // Jika tidak ada 'reviewsCount', gunakan nilai default 1
-          ],
-          'fill-extrusion-opacity': 0.8,
-          'fill-extrusion-vertical-gradient': true
-        }
-      });
     });
 
     const tooltip = document.createElement('div');
@@ -696,14 +645,13 @@ module.exports = function (context, readonly) {
     tooltip.style.padding = '15px';
     tooltip.style.borderRadius = '10px';
     tooltip.style.display = 'none';
-    tooltip.style.maxWidth = '250px'; // Adjusted max width
-    tooltip.style.wordWrap = 'break-word'; // Wrap long text
-    tooltip.style.boxShadow = '0px 4px 6px rgba(0, 0, 0, 0.1)'; // Subtle shadow
-    tooltip.style.fontFamily = 'Arial, sans-serif'; // Font for better readability
+    tooltip.style.maxWidth = '250px';
+    tooltip.style.wordWrap = 'break-word';
+    tooltip.style.boxShadow = '0px 4px 6px rgba(0, 0, 0, 0.1)';
+    tooltip.style.fontFamily = 'Arial, sans-serif';
     document.body.appendChild(tooltip);
 
-    // Add hover interactivity
-    let hoveredFeatureId = null; // Track the current hovered feature
+    let hoveredFeatureId = null;
 
     context.map.on('mousemove', '3d-chart-layer', (e) => {
       const features = context.map.queryRenderedFeatures(e.point, {
@@ -713,13 +661,10 @@ module.exports = function (context, readonly) {
       if (features.length > 0) {
         const feature = features[0];
         if (hoveredFeatureId !== feature.id) {
-          // Hide the previous tooltip
           tooltip.style.display = 'none';
 
-          // Update the hovered feature id
           hoveredFeatureId = feature.id;
 
-          // Build the tooltip content
           const listingName = feature.properties.listing_name;
           const rating = feature.properties.review || 0;
           const totalReview = feature.properties.reviewsCount || 0;
@@ -735,16 +680,13 @@ module.exports = function (context, readonly) {
         <div style="font-size: 14px; color: #555;">📍 Area: ${areaName}</div>
       `;
 
-          // Show the tooltip
           tooltip.style.display = 'block';
 
-          // Set tooltip position (adjust to avoid going off-screen)
           const tooltipWidth = tooltip.offsetWidth;
           const tooltipHeight = tooltip.offsetHeight;
           let tooltipX = e.originalEvent.pageX + 10;
           let tooltipY = e.originalEvent.pageY + 10;
 
-          // Adjust position if it goes off the screen
           if (tooltipX + tooltipWidth > window.innerWidth) {
             tooltipX = window.innerWidth - tooltipWidth - 10;
           }
@@ -756,19 +698,16 @@ module.exports = function (context, readonly) {
           tooltip.style.top = `${tooltipY}px`;
         }
       } else {
-        // Hide tooltip when mouse is not over the layer
         tooltip.style.display = 'none';
         hoveredFeatureId = null;
       }
     });
 
     context.map.on('mouseleave', '3d-chart-layer', () => {
-      // Hide the tooltip when mouse leaves the layer
       tooltip.style.display = 'none';
       hoveredFeatureId = null;
     });
 
-    // Add click interactivity
     context.map.on('click', '3d-chart-layer', (e) => {
       const features = context.map.queryRenderedFeatures(e.point, {
         layers: ['3d-chart-layer']
@@ -779,14 +718,12 @@ module.exports = function (context, readonly) {
         const airbnbUrl = feature.properties.airbnbUrl;
 
         if (airbnbUrl) {
-          // Redirect to Airbnb link
           window.open(airbnbUrl, '_blank');
         }
       }
     });
 
     context.map.on('style.load', () => {
-      // Tambahkan ulang sumber data chart
       context.map.addSource('3d-chart-data', {
         type: 'geojson',
         data: geojsonData
@@ -810,8 +747,8 @@ module.exports = function (context, readonly) {
           ],
           'fill-extrusion-height': [
             'coalesce',
-            ['*', ['get', 'reviewsCount'], 10], // Kalikan 'reviewsCount' dengan 10
-            1 // Jika tidak ada 'reviewsCount', gunakan nilai default 1
+            ['*', ['get', 'reviewsCount'], 10],
+            1
           ],
           'fill-extrusion-opacity': 0.8,
           'fill-extrusion-vertical-gradient': true
@@ -832,9 +769,6 @@ module.exports = function (context, readonly) {
       context.Draw.deleteAll();
       update(stripIds(e.features));
 
-      // delay setting drawing back to false after a drawn feature is created
-      // this allows the map click handler to ignore the click and prevents a popup
-      // if the drawn feature endeds within an existing feature
       setTimeout(() => {
         drawing = false;
       }, 500);
@@ -854,6 +788,50 @@ module.exports = function (context, readonly) {
       maybeShowEditControl();
       if (obj.map) {
         geojsonToLayer(context, writable);
+      }
+    });
+
+    context.map.on('moveend', async () => {
+      const zoom = context.map.getZoom();
+      const center = context.map.getCenter();
+      const bounds = context.map.getBounds();
+
+      console.log(
+        `Map moved to: zoom=${zoom.toFixed(2)}, ` +
+          `viewport: SW(${bounds._sw.lat.toFixed(4)}, ${bounds._sw.lng.toFixed(
+            4
+          )}) ` +
+          `NE(${bounds._ne.lat.toFixed(4)}, ${bounds._ne.lng.toFixed(4)})`
+      );
+
+      const newAirbnbData = await getAirbnbData(zoom, center.lat, center.lng);
+
+      if (newAirbnbData) {
+        const updatedGeojsonData = {
+          type: 'FeatureCollection',
+          features: newAirbnbData.map((listing) => ({
+            type: 'Feature',
+            geometry: {
+              type: 'Polygon',
+              coordinates: getPolygonCoordinates(
+                listing.longitude,
+                listing.latitude
+              )
+            },
+            properties: {
+              listing_name: listing.listing_name,
+              airbnbUrl: `https://www.airbnb.com/rooms/${listing.id}`,
+              height: listing.reviewsCount,
+              area_name: listing.area_name,
+              roomTypeCategory: listing.roomTypeCategory,
+              rate: listing.rate,
+              review: listing.review,
+              reviewsCount: listing.reviewsCount
+            }
+          }))
+        };
+
+        setup3DChart(updatedGeojsonData);
       }
     });
   }

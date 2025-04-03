@@ -7,6 +7,10 @@ import copy from 'rollup-plugin-copy';
 
 import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 const production = !process.env.ROLLUP_WATCH;
 
@@ -25,7 +29,13 @@ export default {
     }),
 
     replace({
-      'require.main === module': 'false' // jsonhint export quirk
+      'require.main === module': 'false', // jsonhint export quirk
+      'process.env.MAPBOX_ACCESS_TOKEN': JSON.stringify(
+        process.env.MAPBOX_ACCESS_TOKEN
+      ),
+      'process.env.API_BASE_URL': JSON.stringify(process.env.API_BASE_URL),
+      'process.env.USER_ID': JSON.stringify(process.env.USER_ID),
+      'process.env.API_TOKEN': JSON.stringify(process.env.API_TOKEN)
     }),
 
     resolve({
