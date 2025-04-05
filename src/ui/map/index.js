@@ -479,8 +479,17 @@ module.exports = function (context, readonly) {
       loadingBar.style.opacity = '0';
     };
 
+    const airbnbDataStorage = {
+      listings: [],
+      renderedIds: new Set(),
+      geojsonData: {
+        type: 'FeatureCollection',
+        features: []
+      }
+    };
+
     // eslint-disable-next-line no-unused-vars
-    async function getAirbnbData(zoom = null, lat = null, lng = null) {
+    async function getAirbnbData(lat = null, lng = null, offset = 0) {
       try {
         showLoading();
 
@@ -498,7 +507,7 @@ module.exports = function (context, readonly) {
               payload: {
                 table: 'airbnb_listings',
                 attributes: [
-                  'id',
+                  'CAST(id AS CHAR) AS id',
                   'listing_name',
                   'area_name',
                   'roomTypeCategory',
@@ -515,8 +524,8 @@ module.exports = function (context, readonly) {
                 associations: [],
                 filters: [],
                 order_by: 'distance_km ASC',
-                limit: 10000,
-                offset: 0
+                limit: 5000,
+                offset: offset * 5000
               }
             })
           }
@@ -527,45 +536,83 @@ module.exports = function (context, readonly) {
         }
 
         const data = await response.json();
-        console.log(data.data);
+
+        console.log(
+          `Fetched data for offset ${offset}:`,
+          (data.data && data.data.length) || 0,
+          'records'
+        );
         return data.data || [];
       } catch (error) {
         console.error('Error:', error);
         return [];
       } finally {
-        hideLoading();
+        if (offset === 5) {
+          hideLoading();
+        }
       }
     }
 
-    const airbnb = await getAirbnbData(
-      0,
+    async function getAllAirbnbData(lat = null, lng = null) {
+      if (airbnbDataStorage.geojsonData.features.length > 0) {
+        setup3DChart(airbnbDataStorage.geojsonData);
+      } else {
+        setup3DChart(airbnbDataStorage.geojsonData);
+      }
+
+      for (let offset = 0; offset <= 5; offset++) {
+        const data = await getAirbnbData(lat, lng, offset);
+
+        const newListings = data.filter(
+          (listing) => !airbnbDataStorage.renderedIds.has(listing.id)
+        );
+
+        if (newListings.length > 0) {
+          console.log(`Rendering ${newListings.length} new listings`);
+
+          const newFeatures = newListings.map((listing) => {
+            airbnbDataStorage.renderedIds.add(listing.id);
+
+            return {
+              type: 'Feature',
+              geometry: {
+                type: 'Polygon',
+                coordinates: getPolygonCoordinates(
+                  listing.longitude,
+                  listing.latitude
+                )
+              },
+              properties: {
+                listing_name: listing.listing_name,
+                airbnbUrl: `https://www.airbnb.com/rooms/${listing.id.toString()}`,
+                height: listing.reviewsCount,
+                area_name: listing.area_name,
+                roomTypeCategory: listing.roomTypeCategory,
+                rate: listing.rate,
+                review: listing.review,
+                reviewsCount: listing.reviewsCount
+              }
+            };
+          });
+
+          airbnbDataStorage.geojsonData.features = [
+            ...airbnbDataStorage.geojsonData.features,
+            ...newFeatures
+          ];
+
+          setup3DChart(airbnbDataStorage.geojsonData);
+        } else {
+          console.log(`No new listings to render for offset ${offset}`);
+        }
+      }
+
+      return airbnbDataStorage.geojsonData.features;
+    }
+
+    await getAllAirbnbData(
       context.map.getCenter().lat,
       context.map.getCenter().lng
     );
-
-    const geojsonData = {
-      type: 'FeatureCollection',
-      features: airbnb.map((listing) => ({
-        type: 'Feature',
-        geometry: {
-          type: 'Polygon',
-          coordinates: getPolygonCoordinates(
-            listing.longitude,
-            listing.latitude
-          )
-        },
-        properties: {
-          listing_name: listing.listing_name,
-          airbnbUrl: `https://www.airbnb.com/rooms/${listing.id}`,
-          height: listing.reviewsCount,
-          area_name: listing.area_name,
-          roomTypeCategory: listing.roomTypeCategory,
-          rate: listing.rate,
-          review: listing.review,
-          reviewsCount: listing.reviewsCount
-        }
-      }))
-    };
 
     function setup3DChart(data) {
       if (!context.map.loaded()) {
@@ -574,10 +621,8 @@ module.exports = function (context, readonly) {
       }
 
       if (context.map.getSource('3d-chart-data')) {
-        if (context.map.getLayer('3d-chart-layer')) {
-          context.map.removeLayer('3d-chart-layer');
-        }
-        context.map.removeSource('3d-chart-data');
+        context.map.getSource('3d-chart-data').setData(data);
+        return;
       }
 
       context.map.addSource('3d-chart-data', {
@@ -611,8 +656,6 @@ module.exports = function (context, readonly) {
         }
       });
     }
-
-    setup3DChart(geojsonData);
 
     context.map.on('load', () => {
       context.data.set({
@@ -719,41 +762,48 @@ module.exports = function (context, readonly) {
 
         if (airbnbUrl) {
           window.open(airbnbUrl, '_blank');
+          console.log('airbnbUrl', airbnbUrl);
         }
       }
     });
 
     context.map.on('style.load', () => {
-      context.map.addSource('3d-chart-data', {
-        type: 'geojson',
-        data: geojsonData
-      });
+      // Only add the source and layer if they don't already exist
+      if (!context.map.getSource('3d-chart-data')) {
+        context.map.addSource('3d-chart-data', {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: []
+          }
+        });
 
-      context.map.addLayer({
-        id: '3d-chart-layer',
-        type: 'fill-extrusion',
-        source: '3d-chart-data',
-        paint: {
-          'fill-extrusion-color': [
-            'interpolate',
-            ['linear'],
-            ['get', 'review'],
-            4,
-            '#ff0000',
-            4.5,
-            '#ffa500',
-            5,
-            '#008000'
-          ],
-          'fill-extrusion-height': [
-            'coalesce',
-            ['*', ['get', 'reviewsCount'], 10],
-            1
-          ],
-          'fill-extrusion-opacity': 0.8,
-          'fill-extrusion-vertical-gradient': true
-        }
-      });
+        context.map.addLayer({
+          id: '3d-chart-layer',
+          type: 'fill-extrusion',
+          source: '3d-chart-data',
+          paint: {
+            'fill-extrusion-color': [
+              'interpolate',
+              ['linear'],
+              ['get', 'review'],
+              4,
+              '#ff0000',
+              4.5,
+              '#ffa500',
+              5,
+              '#008000'
+            ],
+            'fill-extrusion-height': [
+              'coalesce',
+              ['*', ['get', 'reviewsCount'], 10],
+              1
+            ],
+            'fill-extrusion-opacity': 0.8,
+            'fill-extrusion-vertical-gradient': true
+          }
+        });
+      }
     });
 
     context.map.on('draw.create', created);
@@ -804,35 +854,11 @@ module.exports = function (context, readonly) {
           `NE(${bounds._ne.lat.toFixed(4)}, ${bounds._ne.lng.toFixed(4)})`
       );
 
-      const newAirbnbData = await getAirbnbData(zoom, center.lat, center.lng);
+      await getAllAirbnbData(center.lat, center.lng);
 
-      if (newAirbnbData) {
-        const updatedGeojsonData = {
-          type: 'FeatureCollection',
-          features: newAirbnbData.map((listing) => ({
-            type: 'Feature',
-            geometry: {
-              type: 'Polygon',
-              coordinates: getPolygonCoordinates(
-                listing.longitude,
-                listing.latitude
-              )
-            },
-            properties: {
-              listing_name: listing.listing_name,
-              airbnbUrl: `https://www.airbnb.com/rooms/${listing.id}`,
-              height: listing.reviewsCount,
-              area_name: listing.area_name,
-              roomTypeCategory: listing.roomTypeCategory,
-              rate: listing.rate,
-              review: listing.review,
-              reviewsCount: listing.reviewsCount
-            }
-          }))
-        };
-
-        setup3DChart(updatedGeojsonData);
-      }
+      console.log(
+        `Total listings displayed: ${airbnbDataStorage.geojsonData.features.length}`
+      );
     });
   }
 
