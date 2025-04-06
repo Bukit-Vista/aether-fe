@@ -107,8 +107,18 @@ module.exports = function (context, readonly) {
       center: [117.27, 0],
       zoom: 2,
       projection,
-      hash: 'map'
+      hash: 'map',
+      attributionControl: false
     });
+
+    // Add BV Logo
+    const bvLogoContainer = document.createElement('div');
+    bvLogoContainer.className = 'bv-logo-container';
+    const bvLogo = document.createElement('img');
+    bvLogo.src = '/img/bv-logo.png';
+    bvLogo.alt = 'Bukit Vista Logo';
+    bvLogoContainer.appendChild(bvLogo);
+    document.getElementById('map').appendChild(bvLogoContainer);
 
     if (writable) {
       context.map.addControl(
@@ -696,83 +706,12 @@ module.exports = function (context, readonly) {
 
     let hoveredFeatureId = null;
 
-    context.map.on('mousemove', '3d-chart-layer', (e) => {
-      const features = context.map.queryRenderedFeatures(e.point, {
-        layers: ['3d-chart-layer']
-      });
-
-      if (features.length > 0) {
-        const feature = features[0];
-        if (hoveredFeatureId !== feature.id) {
-          tooltip.style.display = 'none';
-
-          hoveredFeatureId = feature.id;
-
-          const listingName = feature.properties.listing_name;
-          const rating = feature.properties.review || 0;
-          const totalReview = feature.properties.reviewsCount || 0;
-          const price = feature.properties.rate;
-          const propertyType = feature.properties.property_type;
-          const areaName = feature.properties.area_name;
-
-          tooltip.innerHTML = `
-        <div style="font-size: 16px; font-weight: bold; color: #333;">${listingName}</div>
-        <div style="font-size: 14px; color: #555;">⭐ Rating: ${rating} (${totalReview} reviews)</div>
-        <div style="font-size: 14px; color: #555;">💰 Price: $${price}/night</div>
-        <div style="font-size: 14px; color: #555;">🏡 Type: ${propertyType}</div>
-        <div style="font-size: 14px; color: #555;">📍 Area: ${areaName}</div>
-      `;
-
-          tooltip.style.display = 'block';
-
-          const tooltipWidth = tooltip.offsetWidth;
-          const tooltipHeight = tooltip.offsetHeight;
-          let tooltipX = e.originalEvent.pageX + 10;
-          let tooltipY = e.originalEvent.pageY + 10;
-
-          if (tooltipX + tooltipWidth > window.innerWidth) {
-            tooltipX = window.innerWidth - tooltipWidth - 10;
-          }
-          if (tooltipY + tooltipHeight > window.innerHeight) {
-            tooltipY = window.innerHeight - tooltipHeight - 10;
-          }
-
-          tooltip.style.left = `${tooltipX}px`;
-          tooltip.style.top = `${tooltipY}px`;
-        }
-      } else {
-        tooltip.style.display = 'none';
-        hoveredFeatureId = null;
-      }
-    });
-
-    context.map.on('mouseleave', '3d-chart-layer', () => {
-      tooltip.style.display = 'none';
-      hoveredFeatureId = null;
-    });
-
-    context.map.on('click', '3d-chart-layer', (e) => {
-      const features = context.map.queryRenderedFeatures(e.point, {
-        layers: ['3d-chart-layer']
-      });
-
-      if (features.length > 0) {
-        const feature = features[0];
-        const airbnbUrl = feature.properties.airbnbUrl;
-
-        if (airbnbUrl) {
-          window.open(airbnbUrl, '_blank');
-          console.log('airbnbUrl', airbnbUrl);
-        }
-      }
-    });
-
     context.map.on('style.load', () => {
       // Only add the source and layer if they don't already exist
       if (!context.map.getSource('3d-chart-data')) {
         context.map.addSource('3d-chart-data', {
           type: 'geojson',
-          data: {
+          data: airbnbDataStorage.geojsonData || {
             type: 'FeatureCollection',
             features: []
           }
@@ -803,8 +742,95 @@ module.exports = function (context, readonly) {
             'fill-extrusion-vertical-gradient': true
           }
         });
+
+        // Re-add event listeners for the 3D chart layer
+        context.map.on('mousemove', '3d-chart-layer', handleChartMouseMove);
+        context.map.on('mouseleave', '3d-chart-layer', handleChartMouseLeave);
+        context.map.on('click', '3d-chart-layer', handleChartClick);
       }
     });
+
+    // Define event handler functions
+    function handleChartMouseMove(e) {
+      const features = context.map.queryRenderedFeatures(e.point, {
+        layers: ['3d-chart-layer']
+      });
+
+      if (features.length > 0) {
+        const feature = features[0];
+        if (hoveredFeatureId !== feature.id) {
+          tooltip.style.display = 'none';
+
+          hoveredFeatureId = feature.id;
+
+          const listingName = feature.properties.listing_name;
+          const rating = feature.properties.review || 0;
+          const totalReview = feature.properties.reviewsCount || 0;
+          const price = feature.properties.rate;
+          const propertyType = feature.properties.property_type;
+          const areaName = feature.properties.area_name;
+
+          tooltip.innerHTML = `
+            <div style="font-size: 16px; font-weight: bold; color: #333;">${listingName}</div>
+            <div style="font-size: 14px; color: #555;">⭐ Rating: ${rating} (${totalReview} reviews)</div>
+            <div style="font-size: 14px; color: #555;">💰 Price: $${price}/night</div>
+            <div style="font-size: 14px; color: #555;">🏡 Type: ${propertyType}</div>
+            <div style="font-size: 14px; color: #555;">📍 Area: ${areaName}</div>
+          `;
+
+          tooltip.style.display = 'block';
+
+          const tooltipWidth = tooltip.offsetWidth;
+          const tooltipHeight = tooltip.offsetHeight;
+          let tooltipX = e.originalEvent.pageX + 10;
+          let tooltipY = e.originalEvent.pageY + 10;
+
+          if (tooltipX + tooltipWidth > window.innerWidth) {
+            tooltipX = window.innerWidth - tooltipWidth - 10;
+          }
+          if (tooltipY + tooltipHeight > window.innerHeight) {
+            tooltipY = window.innerHeight - tooltipHeight - 10;
+          }
+
+          tooltip.style.left = `${tooltipX}px`;
+          tooltip.style.top = `${tooltipY}px`;
+        }
+      } else {
+        tooltip.style.display = 'none';
+        hoveredFeatureId = null;
+      }
+    }
+
+    function handleChartMouseLeave() {
+      tooltip.style.display = 'none';
+      hoveredFeatureId = null;
+    }
+
+    function handleChartClick(e) {
+      const features = context.map.queryRenderedFeatures(e.point, {
+        layers: ['3d-chart-layer']
+      });
+
+      if (features.length > 0) {
+        const feature = features[0];
+        const airbnbUrl = feature.properties.airbnbUrl;
+
+        if (airbnbUrl) {
+          window.open(airbnbUrl, '_blank');
+          console.log('airbnbUrl', airbnbUrl);
+        }
+      }
+    }
+
+    // Remove old event listeners
+    context.map.off('mousemove', '3d-chart-layer');
+    context.map.off('mouseleave', '3d-chart-layer');
+    context.map.off('click', '3d-chart-layer');
+
+    // Add new event listeners
+    context.map.on('mousemove', '3d-chart-layer', handleChartMouseMove);
+    context.map.on('mouseleave', '3d-chart-layer', handleChartMouseLeave);
+    context.map.on('click', '3d-chart-layer', handleChartClick);
 
     context.map.on('draw.create', created);
 
