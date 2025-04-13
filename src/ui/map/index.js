@@ -101,6 +101,15 @@ module.exports = function (context, readonly) {
 
     const { style } = styles.find((d) => d.title === activeStyle);
 
+    const airbnbDataStorage = {
+      listings: [],
+      renderedIds: new Set(),
+      geojsonData: {
+        type: 'FeatureCollection',
+        features: []
+      }
+    };
+
     context.map = new mapboxgl.Map({
       container: 'map',
       style,
@@ -111,7 +120,6 @@ module.exports = function (context, readonly) {
       attributionControl: false
     });
 
-    // Add BV Logo
     const bvLogoContainer = document.createElement('div');
     bvLogoContainer.className = 'bv-logo-container';
     const bvLogo = document.createElement('img');
@@ -119,6 +127,138 @@ module.exports = function (context, readonly) {
     bvLogo.alt = 'Bukit Vista Logo';
     bvLogoContainer.appendChild(bvLogo);
     document.getElementById('map').appendChild(bvLogoContainer);
+
+    const metricFilterContainer = document.createElement('div');
+    metricFilterContainer.className = 'metric-filter-container';
+    metricFilterContainer.style.cssText = `
+      position: absolute;
+      top: 70%;
+      right: 0;
+      transform: translateY(-50%);
+      background: white;
+      padding: 16px;
+      border-radius: 12px 0 0 12px;
+      box-shadow: -2px 0 15px rgba(0,0,0,0.1);
+      z-index: 1;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    `;
+
+    const titleContainer = document.createElement('div');
+    titleContainer.style.cssText = `
+      margin-bottom: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+      color: #333;
+    `;
+    titleContainer.textContent = 'Filter Metrics';
+
+    const toggleButton = document.createElement('button');
+    toggleButton.className = 'metric-filter-toggle';
+    toggleButton.innerHTML = '▶';
+    toggleButton.style.cssText = `
+      position: absolute;
+      left: -32px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: white;
+      border: none;
+      border-radius: 8px 0 0 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+      transition: all 0.2s ease;
+      font-size: 14px;
+      color: #666;
+      &:hover {
+        background: #f5f5f5;
+      }
+    `;
+
+    let isOpen = false;
+    metricFilterContainer.style.transform = 'translateY(-50%) translateX(100%)';
+    toggleButton.innerHTML = '▶';
+
+    toggleButton.addEventListener('click', () => {
+      isOpen = !isOpen;
+      metricFilterContainer.style.transform = isOpen
+        ? 'translateY(-50%)'
+        : 'translateY(-50%) translateX(100%)';
+      toggleButton.innerHTML = isOpen ? '◀' : '▶';
+    });
+
+    const metricSelect = document.createElement('select');
+    metricSelect.style.cssText = `
+      width: 180px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+      font-size: 14px;
+      cursor: pointer;
+      background: #f8f8f8;
+      color: #333;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      transition: all 0.2s ease;
+      outline: none;
+      &:hover {
+        border-color: #ccc;
+        background: #f2f2f2;
+      }
+      &:focus {
+        border-color: #2196F3;
+        box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+      }
+    `;
+
+    const options = [
+      { value: 'review', label: 'Overall Rating' },
+      { value: 'accuracy', label: 'Accuracy' },
+      { value: 'checkin', label: 'Checkin' },
+      { value: 'cleanliness', label: 'Cleanliness' },
+      { value: 'communication', label: 'Communication' },
+      { value: 'location', label: 'Location' },
+      { value: 'value', label: 'Value' }
+    ];
+
+    options.forEach((option) => {
+      const optionElement = document.createElement('option');
+      optionElement.value = option.value;
+      optionElement.textContent = option.label;
+      optionElement.style.cssText = `
+        padding: 8px;
+      `;
+      metricSelect.appendChild(optionElement);
+    });
+
+    metricFilterContainer.appendChild(toggleButton);
+    metricFilterContainer.appendChild(titleContainer);
+    metricFilterContainer.appendChild(metricSelect);
+    document.getElementById('map').appendChild(metricFilterContainer);
+
+    let currentMetric = 'review';
+
+    metricSelect.addEventListener('change', (e) => {
+      currentMetric = e.target.value;
+      if (airbnbDataStorage.geojsonData.features.length > 0) {
+        updateChartColors();
+      }
+    });
+
+    function updateChartColors() {
+      if (context.map.getLayer('3d-chart-layer')) {
+        context.map.setPaintProperty('3d-chart-layer', 'fill-extrusion-color', [
+          'interpolate',
+          ['linear'],
+          ['get', currentMetric],
+          4,
+          '#ff0000',
+          4.5,
+          '#ffa500',
+          5,
+          '#008000'
+        ]);
+      }
+    }
 
     if (writable) {
       context.map.addControl(
@@ -489,15 +629,6 @@ module.exports = function (context, readonly) {
       loadingBar.style.opacity = '0';
     };
 
-    const airbnbDataStorage = {
-      listings: [],
-      renderedIds: new Set(),
-      geojsonData: {
-        type: 'FeatureCollection',
-        features: []
-      }
-    };
-
     // eslint-disable-next-line no-unused-vars
     async function getAirbnbData(lat = null, lng = null, offset = 0) {
       try {
@@ -525,6 +656,12 @@ module.exports = function (context, readonly) {
                   'bedroom',
                   'bed',
                   'review',
+                  'accuracy',
+                  'checkin',
+                  'cleanliness',
+                  'communication',
+                  'location',
+                  'value',
                   'latitude',
                   'longitude',
                   'rate',
@@ -600,6 +737,12 @@ module.exports = function (context, readonly) {
                 roomTypeCategory: listing.roomTypeCategory,
                 rate: listing.rate,
                 review: listing.review,
+                accuracy: listing.accuracy,
+                checkin: listing.checkin,
+                cleanliness: listing.cleanliness,
+                communication: listing.communication,
+                location: listing.location,
+                value: listing.value,
                 reviewsCount: listing.reviewsCount
               }
             };
@@ -698,7 +841,8 @@ module.exports = function (context, readonly) {
     tooltip.style.padding = '15px';
     tooltip.style.borderRadius = '10px';
     tooltip.style.display = 'none';
-    tooltip.style.maxWidth = '250px';
+    tooltip.style.maxWidth = '275px';
+    tooltip.style.boxSizing = 'border-box';
     tooltip.style.wordWrap = 'break-word';
     tooltip.style.boxShadow = '0px 4px 6px rgba(0, 0, 0, 0.1)';
     tooltip.style.fontFamily = 'Arial, sans-serif';
@@ -707,7 +851,6 @@ module.exports = function (context, readonly) {
     let hoveredFeatureId = null;
 
     context.map.on('style.load', () => {
-      // Only add the source and layer if they don't already exist
       if (!context.map.getSource('3d-chart-data')) {
         context.map.addSource('3d-chart-data', {
           type: 'geojson',
@@ -743,14 +886,12 @@ module.exports = function (context, readonly) {
           }
         });
 
-        // Re-add event listeners for the 3D chart layer
         context.map.on('mousemove', '3d-chart-layer', handleChartMouseMove);
         context.map.on('mouseleave', '3d-chart-layer', handleChartMouseLeave);
         context.map.on('click', '3d-chart-layer', handleChartClick);
       }
     });
 
-    // Define event handler functions
     function handleChartMouseMove(e) {
       const features = context.map.queryRenderedFeatures(e.point, {
         layers: ['3d-chart-layer']
@@ -764,18 +905,46 @@ module.exports = function (context, readonly) {
           hoveredFeatureId = feature.id;
 
           const listingName = feature.properties.listing_name;
-          const rating = feature.properties.review || 0;
           const totalReview = feature.properties.reviewsCount || 0;
           const price = feature.properties.rate;
-          const propertyType = feature.properties.property_type;
+          const propertyType = feature.properties.roomTypeCategory;
           const areaName = feature.properties.area_name;
+          const selectedRating = feature.properties[currentMetric] || 0;
+
+          const metricOption = options.find(
+            (opt) => opt.value === currentMetric
+          );
+          const metricLabel = metricOption ? metricOption.label : currentMetric;
 
           tooltip.innerHTML = `
-            <div style="font-size: 16px; font-weight: bold; color: #333;">${listingName}</div>
-            <div style="font-size: 14px; color: #555;">⭐ Rating: ${rating} (${totalReview} reviews)</div>
-            <div style="font-size: 14px; color: #555;">💰 Price: $${price}/night</div>
-            <div style="font-size: 14px; color: #555;">🏡 Type: ${propertyType}</div>
-            <div style="font-size: 14px; color: #555;">📍 Area: ${areaName}</div>
+            <div style="font-size: 16px; font-weight: bold; color: #333; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px; overflow-wrap: break-word;">
+              ${listingName}
+            </div>
+            <div style="display: grid; grid-template-columns: auto 1fr; gap: 8px; font-size: 14px; color: #555;">
+              
+              <div style="display: contents;">
+                <div style="font-weight: 500; display: flex; align-items: center; gap: 4px;">⭐ ${metricLabel}</div>
+                <div style="white-space: nowrap;">${selectedRating.toFixed(
+                  1
+                )} (${totalReview} reviews)</div>
+              </div>
+              
+              <div style="display: contents;">
+                <div style="font-weight: 500; display: flex; align-items: center; gap: 4px;">💰 Price</div>
+                <div>$${price}/night</div>
+              </div>
+              
+              <div style="display: contents;">
+                <div style="font-weight: 500; display: flex; align-items: center; gap: 4px;">🏡 Type</div>
+                <div>${propertyType}</div>
+              </div>
+              
+              <div style="display: contents;">
+                <div style="font-weight: 500; display: flex; align-items: center; gap: 4px;">📍 Area</div>
+                <div>${areaName}</div>
+              </div>
+
+            </div>
           `;
 
           tooltip.style.display = 'block';
@@ -794,6 +963,8 @@ module.exports = function (context, readonly) {
 
           tooltip.style.left = `${tooltipX}px`;
           tooltip.style.top = `${tooltipY}px`;
+          tooltip.style.width = 'fit-content';
+          tooltip.style.padding = '16px';
         }
       } else {
         tooltip.style.display = 'none';
@@ -822,12 +993,10 @@ module.exports = function (context, readonly) {
       }
     }
 
-    // Remove old event listeners
     context.map.off('mousemove', '3d-chart-layer');
     context.map.off('mouseleave', '3d-chart-layer');
     context.map.off('click', '3d-chart-layer');
 
-    // Add new event listeners
     context.map.on('mousemove', '3d-chart-layer', handleChartMouseMove);
     context.map.on('mouseleave', '3d-chart-layer', handleChartMouseLeave);
     context.map.on('click', '3d-chart-layer', handleChartClick);
