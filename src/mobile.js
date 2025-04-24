@@ -3,8 +3,6 @@ const ui = require('./ui'),
   data = require('./core/data'),
   loader = require('./core/loader'),
   router = require('./core/router'),
-  repo = require('./core/repo'),
-  user = require('./core/user'),
   store = require('store');
 
 const gjIO = geojsonIO(),
@@ -21,8 +19,6 @@ function geojsonIO() {
   context.map = map(context, true);
   context.data = data(context);
   context.dispatch.on('route', loader(context));
-  context.repo = repo(context);
   context.router = router(context);
-  context.user = user(context);
   return context;
 }

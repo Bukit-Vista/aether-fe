@@ -36,8 +36,6 @@ const ui = require('./ui'),
   loader = require('./core/loader'),
   router = require('./core/router'),
   recovery = require('./core/recovery'),
-  repo = require('./core/repo'),
-  user = require('./core/user'),
   api = require('./core/api'),
   store = require('store');
 
@@ -58,8 +56,6 @@ function geojsonIO() {
   context.map = map(context);
   context.data = data(context);
   context.dispatch.on('route', loader(context));
-  context.repo = repo(context);
   context.router = router(context);
-  context.user = user(context);
   return context;
 }
