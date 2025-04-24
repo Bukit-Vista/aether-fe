@@ -89,8 +89,6 @@ module.exports = function fileBar(context) {
           .attr('title', (d) => {
             if (
               d.title === 'File' ||
-              d.title === 'GitHub' ||
-              d.title === 'Gist' ||
               d.title === 'Add map layer' ||
               d.title === 'Zoom to features' ||
               d.title === 'Clear' ||
