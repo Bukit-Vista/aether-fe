@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 const mapboxgl = require('mapbox-gl');
 
 require('qs-hash');
@@ -629,54 +630,22 @@ module.exports = function (context, readonly) {
       loadingBar.style.opacity = '0';
     };
 
-    // eslint-disable-next-line no-unused-vars
-    async function getAirbnbData(lat = null, lng = null, offset = 0) {
+    async function getAirbnbData(lat = null, lng = null, skip_index = 0) {
       try {
         showLoading();
 
-        const response = await fetch(
-          `${process.env.API_BASE_URL}/database-service/queries?fn=execute_query`,
-          {
-            method: 'POST',
-            headers: {
-              'user-id': process.env.USER_ID,
-              token: process.env.API_TOKEN,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              database: 'data_warehouse',
-              payload: {
-                table: 'airbnb_listings',
-                attributes: [
-                  'CAST(id AS CHAR) AS id',
-                  'listing_name',
-                  'area_name',
-                  'roomTypeCategory',
-                  'reviewsCount',
-                  'bedroom',
-                  'bed',
-                  'review',
-                  'accuracy',
-                  'checkin',
-                  'cleanliness',
-                  'communication',
-                  'location',
-                  'value',
-                  'latitude',
-                  'longitude',
-                  'rate',
-                  'shortest_beach_distance_km',
-                  `6371 * 2 * ASIN(SQRT(POWER(SIN((latitude - ${lat}) * PI() / 180 / 2), 2) + COS(latitude * PI() / 180) * COS(${lat} * PI() / 180) * POWER(SIN((longitude - ${lng}) * PI() / 180 / 2), 2))) AS distance_km`
-                ],
-                associations: [],
-                filters: [],
-                order_by: 'distance_km ASC',
-                limit: 5000,
-                offset: offset * 5000
-              }
-            })
+        const baseSkip = 5000;
+        const skip = skip_index * baseSkip;
+        const limit = 5000;
+
+        const url = `${process.env.API_BASE_URL}/airbnb-listings?limit=${limit}&lat=${lat}&lng=${lng}&skip=${skip}`;
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
           }
-        );
+        });
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -684,17 +653,12 @@ module.exports = function (context, readonly) {
 
         const data = await response.json();
 
-        console.log(
-          `Fetched data for offset ${offset}:`,
-          (data.data && data.data.length) || 0,
-          'records'
-        );
-        return data.data || [];
+        return data || [];
       } catch (error) {
         console.error('Error:', error);
         return [];
       } finally {
-        if (offset === 5) {
+        if (skip_index === 5) {
           hideLoading();
         }
       }
@@ -707,16 +671,14 @@ module.exports = function (context, readonly) {
         setup3DChart(airbnbDataStorage.geojsonData);
       }
 
-      for (let offset = 0; offset <= 5; offset++) {
-        const data = await getAirbnbData(lat, lng, offset);
+      for (let skip_index = 0; skip_index <= 5; skip_index++) {
+        const data = await getAirbnbData(lat, lng, skip_index);
 
         const newListings = data.filter(
           (listing) => !airbnbDataStorage.renderedIds.has(listing.id)
         );
 
         if (newListings.length > 0) {
-          console.log(`Rendering ${newListings.length} new listings`);
-
           const newFeatures = newListings.map((listing) => {
             airbnbDataStorage.renderedIds.add(listing.id);
 
@@ -755,7 +717,7 @@ module.exports = function (context, readonly) {
 
           setup3DChart(airbnbDataStorage.geojsonData);
         } else {
-          console.log(`No new listings to render for offset ${offset}`);
+          console.log(`No new listings to render for skip index ${skip_index}`);
         }
       }
 
@@ -988,7 +950,6 @@ module.exports = function (context, readonly) {
 
         if (airbnbUrl) {
           window.open(airbnbUrl, '_blank');
-          console.log('airbnbUrl', airbnbUrl);
         }
       }
     }
@@ -1041,19 +1002,7 @@ module.exports = function (context, readonly) {
       const center = context.map.getCenter();
       const bounds = context.map.getBounds();
 
-      console.log(
-        `Map moved to: zoom=${zoom.toFixed(2)}, ` +
-          `viewport: SW(${bounds._sw.lat.toFixed(4)}, ${bounds._sw.lng.toFixed(
-            4
-          )}) ` +
-          `NE(${bounds._ne.lat.toFixed(4)}, ${bounds._ne.lng.toFixed(4)})`
-      );
-
       await getAllAirbnbData(center.lat, center.lng);
-
-      console.log(
-        `Total listings displayed: ${airbnbDataStorage.geojsonData.features.length}`
-      );
     });
   }
 
