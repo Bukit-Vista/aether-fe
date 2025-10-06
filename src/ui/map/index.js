@@ -417,6 +417,7 @@ module.exports = function (context, readonly) {
     document.getElementById('map').appendChild(metricFilterContainer);
 
     let currentMetric = 'review';
+    let reviewsCountMode = 'current'; // default mode
 
     metricSelect.addEventListener('change', (e) => {
       currentMetric = e.target.value;
@@ -424,6 +425,80 @@ module.exports = function (context, readonly) {
         updateChartColors();
       }
     });
+
+    // Review Count Mode Filter
+    const reviewModeContainer = document.createElement('div');
+    reviewModeContainer.style.cssText = `
+      margin-top: 12px;
+      border-top: 1px solid #e0e0e0;
+      padding-top: 12px;
+      width: 100%;
+    `;
+
+    const reviewModeTitle = document.createElement('div');
+    reviewModeTitle.style.cssText = `
+      margin-bottom: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-weight: 600;
+      font-size: 13px;
+      color: #333;
+    `;
+    reviewModeTitle.textContent = 'Review Count Mode';
+
+    const reviewModeSelect = document.createElement('select');
+    reviewModeSelect.style.cssText = `
+      width: 180px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+      font-size: 14px;
+      cursor: pointer;
+      background: #f8f8f8;
+      color: #333;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      transition: all 0.2s ease;
+      outline: none;
+      &:hover {
+        border-color: #ccc;
+        background: #f2f2f2;
+      }
+      &:focus {
+        border-color: #2196F3;
+        box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+      }
+    `;
+
+    const reviewModeOptions = [
+      { value: 'current', label: 'Current Reviews' },
+      { value: 'previous', label: 'Previous Reviews' },
+      { value: 'difference', label: 'Review Difference' }
+    ];
+
+    reviewModeOptions.forEach((option) => {
+      const optionElement = document.createElement('option');
+      optionElement.value = option.value;
+      optionElement.textContent = option.label;
+      optionElement.style.cssText = `
+        padding: 8px;
+      `;
+      reviewModeSelect.appendChild(optionElement);
+    });
+
+    reviewModeSelect.addEventListener('change', async (e) => {
+      reviewsCountMode = e.target.value;
+      // Clear existing data
+      airbnbDataStorage.geojsonData.features = [];
+      airbnbDataStorage.renderedIds.clear();
+      // Reload data with new mode
+      await getAllAirbnbData(
+        context.map.getCenter().lat,
+        context.map.getCenter().lng
+      );
+    });
+
+    reviewModeContainer.appendChild(reviewModeTitle);
+    reviewModeContainer.appendChild(reviewModeSelect);
+    metricFilterContainer.appendChild(reviewModeContainer);
 
     const sliderContainer = document.createElement('div');
     sliderContainer.style.cssText = `
@@ -892,7 +967,7 @@ module.exports = function (context, readonly) {
         const precision = 2;
         const cacheKey = `${lat ? lat.toFixed(precision) : 'null'}_${
           lng ? lng.toFixed(precision) : 'null'
-        }_${skip_index}`;
+        }_${skip_index}_${reviewsCountMode}`;
 
         if (airbnbDataStorage.cache.isCacheValid(cacheKey)) {
           const cachedData = airbnbDataStorage.cache.getFromCache(cacheKey);
@@ -902,7 +977,12 @@ module.exports = function (context, readonly) {
           }
         }
 
-        const url = `${process.env.API_BASE_URL}/airbnb-listings?limit=${limit}&lat=${lat}&lng=${lng}&skip=${skip}`;
+        let url = `${process.env.API_BASE_URL}/airbnb-listings?limit=${limit}&lat=${lat}&lng=${lng}&skip=${skip}`;
+        
+        // Add reviews_count_mode parameter if not current (default)
+        if (reviewsCountMode !== 'current') {
+          url += `&reviews_count_mode=${reviewsCountMode}`;
+        }
 
         const response = await fetch(url, {
           method: 'POST',
@@ -1047,7 +1127,16 @@ module.exports = function (context, readonly) {
           ],
           'fill-extrusion-height': [
             'coalesce',
-            ['*', ['get', 'reviewsCount'], 10],
+            [
+              '*',
+              [
+                'case',
+                ['<', ['get', 'reviewsCount'], 0],
+                ['*', ['get', 'reviewsCount'], -1], // Use absolute value for negative numbers
+                ['get', 'reviewsCount']
+              ],
+              10
+            ],
             1
           ],
           'fill-extrusion-opacity': 0.8,
@@ -1124,7 +1213,16 @@ module.exports = function (context, readonly) {
             ],
             'fill-extrusion-height': [
               'coalesce',
-              ['*', ['get', 'reviewsCount'], 10],
+              [
+                '*',
+                [
+                  'case',
+                  ['<', ['get', 'reviewsCount'], 0],
+                  ['*', ['get', 'reviewsCount'], -1], // Use absolute value for negative numbers
+                  ['get', 'reviewsCount']
+                ],
+                10
+              ],
               1
             ],
             'fill-extrusion-opacity': 0.8,
@@ -1162,6 +1260,15 @@ module.exports = function (context, readonly) {
           );
           const metricLabel = metricOption ? metricOption.label : currentMetric;
 
+          const reviewModeOption = reviewModeOptions.find(
+            (opt) => opt.value === reviewsCountMode
+          );
+          const reviewModeLabel = reviewModeOption ? reviewModeOption.label : reviewsCountMode;
+          
+          const reviewCountLabel = reviewsCountMode === 'difference' 
+            ? `${totalReview > 0 ? '+' : ''}${totalReview} reviews`
+            : `${totalReview} reviews`;
+
           tooltip.innerHTML = `
             <div style="font-size: 16px; font-weight: bold; color: #333; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px; overflow-wrap: break-word;">
               ${listingName}
@@ -1170,9 +1277,17 @@ module.exports = function (context, readonly) {
               
               <div style="display: contents;">
                 <div style="font-weight: 500; display: flex; align-items: center; gap: 4px;">⭐ ${metricLabel}</div>
-                <div style="white-space: nowrap;">${selectedRating.toFixed(
-                  1
-                )} (${totalReview} reviews)</div>
+                <div style="white-space: nowrap;">${selectedRating.toFixed(1)}</div>
+              </div>
+              
+              <div style="display: contents;">
+                <div style="font-weight: 500; display: flex; align-items: center; gap: 4px;">📊 Reviews</div>
+                <div style="white-space: nowrap;">${reviewCountLabel}</div>
+              </div>
+
+              <div style="display: contents;">
+                <div style="font-weight: 500; display: flex; align-items: center; gap: 4px;">📈 Mode</div>
+                <div style="white-space: nowrap; font-size: 12px; background: #e3f2fd; padding: 2px 8px; border-radius: 4px; color: #1976d2;">${reviewModeLabel}</div>
               </div>
               
               <div style="display: contents;">
