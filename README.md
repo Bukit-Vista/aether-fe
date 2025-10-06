@@ -11,6 +11,7 @@ Full API documentation can be found in [API.md](API.md).
 1. Clone this repository
 2. Install dependencies
 3. Run `npm start`
+4. If error (../dist/css/tailwind_dist.css) happen, run `npm i -D rollup-plugin-postcss tailwindcss autoprefixer @rollup/plugin-replace`
 
 `npm start` uses `concurrently` to run `live-server` which will serve the project directory in your browser and listen for changes, `rollup` which will build the js and css bundles, and `npx tailwindcss` which builds `css/tailwind_dist.css` (including only the tailwind rules needed in the project)
 
