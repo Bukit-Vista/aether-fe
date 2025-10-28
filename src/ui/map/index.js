@@ -113,23 +113,32 @@ module.exports = function (context, readonly) {
       cache: {
         compressData: function (data) {
           try {
-            return data.map((item) => ({
+            // Optimize: reduce redundant parseFloat + toFixed operations
+            const dataLength = data.length;
+            const compressed = new Array(dataLength);
+            
+            for (let i = 0; i < dataLength; i++) {
+              const item = data[i];
+              compressed[i] = {
               id: item.id,
-              longitude: parseFloat(item.longitude.toFixed(5)),
-              latitude: parseFloat(item.latitude.toFixed(5)),
+                longitude: Math.round(item.longitude * 100000) / 100000,
+                latitude: Math.round(item.latitude * 100000) / 100000,
               listing_name: item.listing_name,
               reviewsCount: item.reviewsCount || 0,
               area_name: item.area_name || '',
               roomTypeCategory: item.roomTypeCategory || '',
               rate: item.rate || 0,
-              review: parseFloat((item.review || 0).toFixed(1)),
-              accuracy: parseFloat((item.accuracy || 0).toFixed(1)),
-              checkin: parseFloat((item.checkin || 0).toFixed(1)),
-              cleanliness: parseFloat((item.cleanliness || 0).toFixed(1)),
-              communication: parseFloat((item.communication || 0).toFixed(1)),
-              location: parseFloat((item.location || 0).toFixed(1)),
-              value: parseFloat((item.value || 0).toFixed(1))
-            }));
+                review: Math.round((item.review || 0) * 10) / 10,
+                accuracy: Math.round((item.accuracy || 0) * 10) / 10,
+                checkin: Math.round((item.checkin || 0) * 10) / 10,
+                cleanliness: Math.round((item.cleanliness || 0) * 10) / 10,
+                communication: Math.round((item.communication || 0) * 10) / 10,
+                location: Math.round((item.location || 0) * 10) / 10,
+                value: Math.round((item.value || 0) * 10) / 10
+              };
+            }
+            
+            return compressed;
           } catch (error) {
             console.warn('Failed to compress data:', error);
             return data;
@@ -244,30 +253,32 @@ module.exports = function (context, readonly) {
         },
         clearExpiredCache: function () {
           try {
-            Object.keys(airbnbDataStorage.memoryCache).forEach((key) => {
+            const now = Date.now();
+            const maxAgeMs = 24 * 3600000; // 24 hours
+            
+            // Clear expired memory cache
+            const memCacheKeys = Object.keys(airbnbDataStorage.memoryCache);
+            for (let i = 0; i < memCacheKeys.length; i++) {
+              const key = memCacheKeys[i];
               const entry = airbnbDataStorage.memoryCache[key];
-              if (
-                entry.timestamp &&
-                Date.now() - entry.timestamp > 24 * 3600000
-              ) {
+              if (entry.timestamp && now - entry.timestamp > maxAgeMs) {
                 delete airbnbDataStorage.memoryCache[key];
               }
-            });
+            }
 
-            const maxAgeMs = 24 * 3600000;
-            Object.keys(localStorage).forEach((key) => {
-              if (
-                key.startsWith('airbnb_data_') &&
-                key.endsWith('_timestamp')
-              ) {
-                const dataKey = key.replace('_timestamp', '');
+            // Clear expired localStorage cache
+            const localStorageKeys = Object.keys(localStorage);
+            for (let i = 0; i < localStorageKeys.length; i++) {
+              const key = localStorageKeys[i];
+              if (key.startsWith('airbnb_data_') && key.endsWith('_timestamp')) {
                 const timestamp = parseInt(localStorage.getItem(key));
-                if (Date.now() - timestamp > maxAgeMs) {
+                if (now - timestamp > maxAgeMs) {
+                  const dataKey = key.slice(0, -10); // Remove '_timestamp' suffix
                   localStorage.removeItem(dataKey);
                   localStorage.removeItem(key);
                 }
               }
-            });
+            }
           } catch (error) {
             console.warn('Failed to clear expired cache:', error);
           }
@@ -297,8 +308,20 @@ module.exports = function (context, readonly) {
 
     let offsetValue = 0.0003;
 
+    // Memoization cache for polygon coordinates to avoid redundant calculations
+    const polygonCache = new Map();
+    const POLYGON_CACHE_MAX_SIZE = 10000;
+
     const getPolygonCoordinates = (longitude, latitude) => {
-      return [
+      // Create cache key with current offset
+      const cacheKey = `${longitude}_${latitude}_${offsetValue}`;
+      
+      // Check cache first
+      if (polygonCache.has(cacheKey)) {
+        return polygonCache.get(cacheKey);
+      }
+      
+      const coordinates = [
         [
           [longitude - offsetValue, latitude - offsetValue],
           [longitude + offsetValue, latitude - offsetValue],
@@ -307,6 +330,14 @@ module.exports = function (context, readonly) {
           [longitude - offsetValue, latitude - offsetValue]
         ]
       ];
+      
+      // Cache management: clear if too large
+      if (polygonCache.size >= POLYGON_CACHE_MAX_SIZE) {
+        polygonCache.clear();
+      }
+      
+      polygonCache.set(cacheKey, coordinates);
+      return coordinates;
     };
 
     const metricFilterContainer = document.createElement('div');
@@ -418,11 +449,18 @@ module.exports = function (context, readonly) {
 
     let currentMetric = 'review';
     let reviewsCountMode = 'current'; // default mode
+    let currentFetchController = null; // Track ongoing fetch operations
+    let isFetching = false; // Track if currently fetching
+    let moveendDebounceTimer = null; // Debounce timer for map movement
+    let minRating = 0; // Minimum rating filter
+    let maxRating = 5; // Maximum rating filter
+    let ratingFilterDebounceTimer = null; // Debounce timer for rating filter
 
     metricSelect.addEventListener('change', (e) => {
       currentMetric = e.target.value;
       if (airbnbDataStorage.geojsonData.features.length > 0) {
         updateChartColors();
+        applyRatingFilter();
       }
     });
 
@@ -469,8 +507,8 @@ module.exports = function (context, readonly) {
     `;
 
     const reviewModeOptions = [
-      { value: 'current', label: 'Current Reviews' },
-      { value: 'previous', label: 'Previous Reviews' },
+      { value: 'current', label: 'October 2025 Dataset' },
+      { value: 'previous', label: 'May 2025 Dataset' },
       { value: 'difference', label: 'Review Difference' }
     ];
 
@@ -485,20 +523,219 @@ module.exports = function (context, readonly) {
     });
 
     reviewModeSelect.addEventListener('change', async (e) => {
-      reviewsCountMode = e.target.value;
+      const newMode = e.target.value;
+      
+      // Abort any ongoing fetch operations
+      if (currentFetchController) {
+        currentFetchController.abort();
+        console.log('Aborted previous fetch operation');
+      }
+      
+      // Update mode
+      reviewsCountMode = newMode;
+      
       // Clear existing data
       airbnbDataStorage.geojsonData.features = [];
       airbnbDataStorage.renderedIds.clear();
+      
+      // Clear the 3D chart layer immediately to prevent mixing old data
+      if (context.map.getSource('3d-chart-data')) {
+        context.map.getSource('3d-chart-data').setData({
+          type: 'FeatureCollection',
+          features: []
+        });
+      }
+      
+      // Add small delay to ensure cleanup completes
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Only proceed if mode hasn't changed again during delay
+      if (reviewsCountMode === newMode) {
       // Reload data with new mode
       await getAllAirbnbData(
         context.map.getCenter().lat,
         context.map.getCenter().lng
       );
+      }
     });
 
     reviewModeContainer.appendChild(reviewModeTitle);
     reviewModeContainer.appendChild(reviewModeSelect);
     metricFilterContainer.appendChild(reviewModeContainer);
+
+    // Rating Range Filter
+    const ratingRangeContainer = document.createElement('div');
+    ratingRangeContainer.style.cssText = `
+      margin-top: 12px;
+      border-top: 1px solid #e0e0e0;
+      padding-top: 12px;
+      width: 100%;
+    `;
+
+    const ratingRangeTitle = document.createElement('div');
+    ratingRangeTitle.style.cssText = `
+      margin-bottom: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-weight: 600;
+      font-size: 13px;
+      color: #333;
+    `;
+    ratingRangeTitle.textContent = 'Rating Range';
+
+    const ratingInputsContainer = document.createElement('div');
+    ratingInputsContainer.style.cssText = `
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    `;
+
+    // Min Rating Input
+    const minRatingContainer = document.createElement('div');
+    minRatingContainer.style.cssText = `
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    `;
+
+    const minRatingLabel = document.createElement('label');
+    minRatingLabel.textContent = 'Min';
+    minRatingLabel.style.cssText = `
+      font-size: 12px;
+      font-weight: 500;
+      color: #666;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    `;
+
+    const minRatingInput = document.createElement('input');
+    minRatingInput.type = 'number';
+    minRatingInput.min = '0';
+    minRatingInput.max = '5';
+    minRatingInput.step = '0.1';
+    minRatingInput.value = '0';
+    minRatingInput.style.cssText = `
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid #e0e0e0;
+      font-size: 14px;
+      background: #f8f8f8;
+      color: #333;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      transition: all 0.2s ease;
+      outline: none;
+      width: 100%;
+      &:hover {
+        border-color: #ccc;
+        background: #f2f2f2;
+      }
+      &:focus {
+        border-color: #2196F3;
+        background: white;
+        box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+      }
+    `;
+
+    // Max Rating Input
+    const maxRatingContainer = document.createElement('div');
+    maxRatingContainer.style.cssText = `
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    `;
+
+    const maxRatingLabel = document.createElement('label');
+    maxRatingLabel.textContent = 'Max';
+    maxRatingLabel.style.cssText = `
+      font-size: 12px;
+      font-weight: 500;
+      color: #666;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    `;
+
+    const maxRatingInput = document.createElement('input');
+    maxRatingInput.type = 'number';
+    maxRatingInput.min = '0';
+    maxRatingInput.max = '5';
+    maxRatingInput.step = '0.1';
+    maxRatingInput.value = '5';
+    maxRatingInput.style.cssText = `
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid #e0e0e0;
+      font-size: 14px;
+      background: #f8f8f8;
+      color: #333;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      transition: all 0.2s ease;
+      outline: none;
+      width: 100%;
+      &:hover {
+        border-color: #ccc;
+        background: #f2f2f2;
+      }
+      &:focus {
+        border-color: #2196F3;
+        background: white;
+        box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+      }
+    `;
+
+    // Add event listeners for rating filter
+    const handleRatingFilterChange = () => {
+      if (ratingFilterDebounceTimer) {
+        clearTimeout(ratingFilterDebounceTimer);
+      }
+
+      ratingFilterDebounceTimer = setTimeout(() => {
+        const minVal = parseFloat(minRatingInput.value);
+        const maxVal = parseFloat(maxRatingInput.value);
+
+        // Validate inputs
+        if (minVal > maxVal) {
+          minRatingInput.value = maxVal;
+          minRating = maxVal;
+        } else {
+          minRating = minVal;
+        }
+
+        if (maxVal < minVal) {
+          maxRatingInput.value = minVal;
+          maxRating = minVal;
+        } else {
+          maxRating = maxVal;
+        }
+
+        // Ensure values are within bounds
+        minRating = Math.max(0, Math.min(5, minRating));
+        maxRating = Math.max(0, Math.min(5, maxRating));
+
+        minRatingInput.value = minRating;
+        maxRatingInput.value = maxRating;
+
+        applyRatingFilter();
+      }, 300); // 300ms debounce for smooth input
+    };
+
+    minRatingInput.addEventListener('input', handleRatingFilterChange);
+    maxRatingInput.addEventListener('input', handleRatingFilterChange);
+
+    // Assemble min rating container
+    minRatingContainer.appendChild(minRatingLabel);
+    minRatingContainer.appendChild(minRatingInput);
+
+    // Assemble max rating container
+    maxRatingContainer.appendChild(maxRatingLabel);
+    maxRatingContainer.appendChild(maxRatingInput);
+
+    // Assemble inputs container
+    ratingInputsContainer.appendChild(minRatingContainer);
+    ratingInputsContainer.appendChild(maxRatingContainer);
+
+    // Assemble rating range container
+    ratingRangeContainer.appendChild(ratingRangeTitle);
+    ratingRangeContainer.appendChild(ratingInputsContainer);
+    metricFilterContainer.appendChild(ratingRangeContainer);
 
     const sliderContainer = document.createElement('div');
     sliderContainer.style.cssText = `
@@ -544,40 +781,57 @@ module.exports = function (context, readonly) {
       margin: 5px 0;
     `;
 
+    let sliderDebounceTimer = null;
+    
     offsetSlider.addEventListener('input', (e) => {
       offsetValue = parseFloat(e.target.value);
       sliderLabel.textContent = getPolygonSizeLabel(offsetValue);
+      
+      // Clear polygon cache when offset changes
+      polygonCache.clear();
 
-      if (airbnbDataStorage.geojsonData.features.length > 0) {
-        airbnbDataStorage.geojsonData.features =
-          airbnbDataStorage.geojsonData.features.map((feature) => {
+      // Debounce polygon size updates for better performance
+      if (sliderDebounceTimer) {
+        clearTimeout(sliderDebounceTimer);
+      }
+
+      sliderDebounceTimer = setTimeout(() => {
+        if (airbnbDataStorage.geojsonData.features.length > 0) {
+          const featuresLength = airbnbDataStorage.geojsonData.features.length;
+          
+          // Optimize: directly modify features instead of creating new array
+          for (let i = 0; i < featuresLength; i++) {
+            const feature = airbnbDataStorage.geojsonData.features[i];
             const coordinates = feature.geometry.coordinates[0];
+            
             if (coordinates && coordinates.length > 0) {
-              const sumLng = coordinates.reduce(
-                (sum, coord) => sum + coord[0],
-                0
-              );
-              const sumLat = coordinates.reduce(
-                (sum, coord) => sum + coord[1],
-                0
-              );
-              const centerLng = sumLng / coordinates.length;
-              const centerLat = sumLat / coordinates.length;
+              // Optimized center calculation
+              let sumLng = 0;
+              let sumLat = 0;
+              const coordLength = coordinates.length;
+              
+              for (let j = 0; j < coordLength; j++) {
+                sumLng += coordinates[j][0];
+                sumLat += coordinates[j][1];
+              }
+              
+              const centerLng = sumLng / coordLength;
+              const centerLat = sumLat / coordLength;
 
               feature.geometry.coordinates = getPolygonCoordinates(
                 centerLng,
                 centerLat
               );
             }
-            return feature;
-          });
+          }
 
-        if (context.map.getSource('3d-chart-data')) {
-          context.map
-            .getSource('3d-chart-data')
-            .setData(airbnbDataStorage.geojsonData);
+          if (context.map.getSource('3d-chart-data')) {
+            context.map
+              .getSource('3d-chart-data')
+              .setData(getFilteredGeojson());
+          }
         }
-      }
+      }, 100); // 100ms debounce for smooth slider interaction
     });
 
     sliderContainer.appendChild(sliderLabel);
@@ -597,6 +851,43 @@ module.exports = function (context, readonly) {
           5,
           '#008000'
         ]);
+      }
+    }
+
+    // Helper function to get filtered geojson - ALWAYS use this instead of raw data
+    function getFilteredGeojson() {
+      if (!airbnbDataStorage.geojsonData.features || airbnbDataStorage.geojsonData.features.length === 0) {
+        return {
+          type: 'FeatureCollection',
+          features: []
+        };
+      }
+
+      // Filter features based on current metric and rating range
+      const allFeatures = airbnbDataStorage.geojsonData.features;
+      
+      // If no filter is applied (default values), return all features for better performance
+      if (minRating === 0 && maxRating === 5) {
+        return airbnbDataStorage.geojsonData;
+      }
+      
+      const filteredFeatures = allFeatures.filter(feature => {
+        const rating = feature.properties[currentMetric];
+        // Handle null/undefined ratings
+        if (rating === null || rating === undefined) return false;
+        return rating >= minRating && rating <= maxRating;
+      });
+
+      return {
+        type: 'FeatureCollection',
+        features: filteredFeatures
+      };
+    }
+
+    function applyRatingFilter() {
+      // Update the map with filtered data
+      if (context.map.getSource('3d-chart-data')) {
+        context.map.getSource('3d-chart-data').setData(getFilteredGeojson());
       }
     }
 
@@ -956,7 +1247,7 @@ module.exports = function (context, readonly) {
       loadingBar.style.opacity = '0';
     };
 
-    async function getAirbnbData(lat = null, lng = null, skip_index = 0) {
+    async function getAirbnbData(lat = null, lng = null, skip_index = 0, modeAtFetchStart = null) {
       try {
         showLoading();
 
@@ -965,14 +1256,20 @@ module.exports = function (context, readonly) {
         const limit = 5000;
 
         const precision = 2;
-        const cacheKey = `${lat ? lat.toFixed(precision) : 'null'}_${
-          lng ? lng.toFixed(precision) : 'null'
-        }_${skip_index}_${reviewsCountMode}`;
+        // Optimize cache key generation - avoid conditional checks in template
+        const latKey = lat ? lat.toFixed(precision) : 'null';
+        const lngKey = lng ? lng.toFixed(precision) : 'null';
+        const cacheKey = `${latKey}_${lngKey}_${skip_index}_${reviewsCountMode}`;
 
         if (airbnbDataStorage.cache.isCacheValid(cacheKey)) {
           const cachedData = airbnbDataStorage.cache.getFromCache(cacheKey);
           if (cachedData && cachedData.length > 0) {
             console.log(`Using cached data for ${cacheKey}`);
+            // Validate mode hasn't changed
+            if (modeAtFetchStart && reviewsCountMode !== modeAtFetchStart) {
+              console.log(`Mode changed from ${modeAtFetchStart} to ${reviewsCountMode}, discarding cached data`);
+              return [];
+            }
             return cachedData;
           }
         }
@@ -988,7 +1285,8 @@ module.exports = function (context, readonly) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
-          }
+          },
+          signal: currentFetchController?.signal
         });
 
         if (!response.ok) {
@@ -996,6 +1294,12 @@ module.exports = function (context, readonly) {
         }
 
         const data = await response.json();
+        
+        // Validate mode hasn't changed before saving/returning data
+        if (modeAtFetchStart && reviewsCountMode !== modeAtFetchStart) {
+          console.log(`Mode changed from ${modeAtFetchStart} to ${reviewsCountMode}, discarding fetched data`);
+          return [];
+        }
 
         if (data && data.length > 0) {
           airbnbDataStorage.cache.saveToCache(cacheKey, data);
@@ -1003,6 +1307,10 @@ module.exports = function (context, readonly) {
 
         return data || [];
       } catch (error) {
+        if (error.name === 'AbortError') {
+          console.log('Fetch aborted due to mode change');
+          return [];
+        }
         console.error('Error:', error);
         return [];
       } finally {
@@ -1013,20 +1321,38 @@ module.exports = function (context, readonly) {
     }
 
     async function getAllAirbnbData(lat = null, lng = null) {
-      if (airbnbDataStorage.geojsonData.features.length > 0) {
-        setup3DChart(airbnbDataStorage.geojsonData);
-      } else {
-        setup3DChart(airbnbDataStorage.geojsonData);
-      }
+      // Create new AbortController for this fetch operation
+      currentFetchController = new AbortController();
+      const modeAtStart = reviewsCountMode; // Capture mode at start of fetch
+      isFetching = true;
+      
+      // Always ensure we start with clean data structure
+      // Setup chart with current data (could be empty when switching modes)
+        setup3DChart(getFilteredGeojson());
 
       let hasNewData = false;
 
+      try {
       for (let skip_index = 0; skip_index <= 5; skip_index++) {
-        const data = await getAirbnbData(lat, lng, skip_index);
+          // Check if mode changed before each batch
+          if (reviewsCountMode !== modeAtStart) {
+            console.log(`Mode changed during fetch, stopping data load`);
+            isFetching = false;
+            return [];
+          }
+          
+          const data = await getAirbnbData(lat, lng, skip_index, modeAtStart);
 
         if (!data || data.length === 0) {
           continue;
         }
+
+          // Double check mode hasn't changed after fetch completes
+          if (reviewsCountMode !== modeAtStart) {
+            console.log(`Mode changed after fetch, discarding data`);
+            isFetching = false;
+            return [];
+          }
 
         const newListings = data.filter(
           (listing) => !airbnbDataStorage.renderedIds.has(listing.id)
@@ -1036,13 +1362,26 @@ module.exports = function (context, readonly) {
           hasNewData = true;
 
           const batchSize = 500;
+            const featuresArray = airbnbDataStorage.geojsonData.features;
+            let shouldUpdateChart = false;
+            
           for (let i = 0; i < newListings.length; i += batchSize) {
+              // Check mode before processing each batch
+              if (reviewsCountMode !== modeAtStart) {
+                console.log(`Mode changed during batch processing, stopping`);
+                isFetching = false;
+                return [];
+              }
+              
             const batch = newListings.slice(i, i + batchSize);
+              const batchLength = batch.length;
 
-            const newFeatures = batch.map((listing) => {
+              // Pre-allocate and directly push for better performance
+              for (let j = 0; j < batchLength; j++) {
+                const listing = batch[j];
               airbnbDataStorage.renderedIds.add(listing.id);
 
-              return {
+                featuresArray.push({
                 type: 'Feature',
                 geometry: {
                   type: 'Polygon',
@@ -1053,7 +1392,7 @@ module.exports = function (context, readonly) {
                 },
                 properties: {
                   listing_name: listing.listing_name,
-                  airbnbUrl: `https://www.airbnb.com/rooms/${listing.id.toString()}`,
+                    airbnbUrl: `https://www.airbnb.com/rooms/${listing.id}`,
                   height: listing.reviewsCount,
                   area_name: listing.area_name,
                   roomTypeCategory: listing.roomTypeCategory,
@@ -1067,22 +1406,28 @@ module.exports = function (context, readonly) {
                   value: listing.value,
                   reviewsCount: listing.reviewsCount
                 }
-              };
-            });
+                });
+              }
 
-            airbnbDataStorage.geojsonData.features = [
-              ...airbnbDataStorage.geojsonData.features,
-              ...newFeatures
-            ];
-
+              // Only update chart for intermediate batches, not every time
             if (i + batchSize < newListings.length) {
-              setup3DChart(airbnbDataStorage.geojsonData);
+              setup3DChart(getFilteredGeojson());
               await new Promise((resolve) => setTimeout(resolve, 0));
+              } else {
+                shouldUpdateChart = true;
             }
           }
 
-          setup3DChart(airbnbDataStorage.geojsonData);
+            // Final update after all batches processed
+            if (shouldUpdateChart) {
+          setup3DChart(getFilteredGeojson());
         }
+          }
+        }
+      } catch (error) {
+        console.error('Error in getAllAirbnbData:', error);
+      } finally {
+        isFetching = false;
       }
 
       return airbnbDataStorage.geojsonData.features;
@@ -1189,10 +1534,7 @@ module.exports = function (context, readonly) {
       if (!context.map.getSource('3d-chart-data')) {
         context.map.addSource('3d-chart-data', {
           type: 'geojson',
-          data: airbnbDataStorage.geojsonData || {
-            type: 'FeatureCollection',
-            features: []
-          }
+          data: getFilteredGeojson()
         });
 
         context.map.addLayer({
@@ -1396,16 +1738,30 @@ module.exports = function (context, readonly) {
       }
     });
 
-    context.map.on('moveend', async () => {
+    context.map.on('moveend', () => {
+      // Debounce map movement to prevent excessive data fetching
+      if (moveendDebounceTimer) {
+        clearTimeout(moveendDebounceTimer);
+      }
+      
+      moveendDebounceTimer = setTimeout(async () => {
       const zoom = context.map.getZoom();
       const center = context.map.getCenter();
-      const bounds = context.map.getBounds();
 
       if (zoom > 10) {
+          // Abort any ongoing fetch before starting new one
+          if (currentFetchController && isFetching) {
+            currentFetchController.abort();
+            console.log('Aborted fetch due to map movement');
+          }
+          
+          isFetching = true;
         await getAllAirbnbData(center.lat, center.lng);
+          isFetching = false;
       } else {
         console.log('Zoom level too low for data fetching:', zoom);
       }
+      }, 300); // 300ms debounce delay
     });
   }
 
