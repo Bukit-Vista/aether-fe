@@ -455,6 +455,7 @@ module.exports = function (context, readonly) {
     let minRating = 0; // Minimum rating filter
     let maxRating = 5; // Maximum rating filter
     let ratingFilterDebounceTimer = null; // Debounce timer for rating filter
+    let bedroomFilter = 'all'; // Bedroom filter: 'all', '1', '2', '3', '4', '5', '6+'
 
     metricSelect.addEventListener('change', (e) => {
       currentMetric = e.target.value;
@@ -737,6 +738,77 @@ module.exports = function (context, readonly) {
     ratingRangeContainer.appendChild(ratingInputsContainer);
     metricFilterContainer.appendChild(ratingRangeContainer);
 
+    // Bedroom Filter
+    const bedroomFilterContainer = document.createElement('div');
+    bedroomFilterContainer.style.cssText = `
+      margin-top: 12px;
+      border-top: 1px solid #e0e0e0;
+      padding-top: 12px;
+      width: 100%;
+    `;
+
+    const bedroomFilterTitle = document.createElement('div');
+    bedroomFilterTitle.style.cssText = `
+      margin-bottom: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-weight: 600;
+      font-size: 13px;
+      color: #333;
+    `;
+    bedroomFilterTitle.textContent = 'Bedrooms';
+
+    const bedroomSelect = document.createElement('select');
+    bedroomSelect.style.cssText = `
+      width: 180px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+      font-size: 14px;
+      cursor: pointer;
+      background: #f8f8f8;
+      color: #333;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      transition: all 0.2s ease;
+      outline: none;
+      &:hover {
+        border-color: #ccc;
+        background: #f2f2f2;
+      }
+      &:focus {
+        border-color: #2196F3;
+        box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+      }
+    `;
+
+    const bedroomOptions = [
+      { value: 'all', label: 'All Bedrooms' },
+      { value: '1', label: '1 Bedroom' },
+      { value: '2', label: '2 Bedrooms' },
+      { value: '3', label: '3 Bedrooms' },
+      { value: '4', label: '4 Bedrooms' },
+      { value: '5', label: '5 Bedrooms' },
+      { value: '6+', label: '6+ Bedrooms' }
+    ];
+
+    bedroomOptions.forEach((option) => {
+      const optionElement = document.createElement('option');
+      optionElement.value = option.value;
+      optionElement.textContent = option.label;
+      optionElement.style.cssText = `
+        padding: 8px;
+      `;
+      bedroomSelect.appendChild(optionElement);
+    });
+
+    bedroomSelect.addEventListener('change', (e) => {
+      bedroomFilter = e.target.value;
+      applyRatingFilter();
+    });
+
+    bedroomFilterContainer.appendChild(bedroomFilterTitle);
+    bedroomFilterContainer.appendChild(bedroomSelect);
+    metricFilterContainer.appendChild(bedroomFilterContainer);
+
     const sliderContainer = document.createElement('div');
     sliderContainer.style.cssText = `
       margin-top: 12px;
@@ -863,19 +935,44 @@ module.exports = function (context, readonly) {
         };
       }
 
-      // Filter features based on current metric and rating range
+      // Filter features based on current metric, rating range, and bedroom count
       const allFeatures = airbnbDataStorage.geojsonData.features;
       
+      // Check if any filter is applied
+      const hasRatingFilter = minRating !== 0 || maxRating !== 5;
+      const hasBedroomFilter = bedroomFilter !== 'all';
+      
       // If no filter is applied (default values), return all features for better performance
-      if (minRating === 0 && maxRating === 5) {
+      if (!hasRatingFilter && !hasBedroomFilter) {
         return airbnbDataStorage.geojsonData;
       }
       
       const filteredFeatures = allFeatures.filter(feature => {
-        const rating = feature.properties[currentMetric];
-        // Handle null/undefined ratings
-        if (rating === null || rating === undefined) return false;
-        return rating >= minRating && rating <= maxRating;
+        // Rating filter
+        if (hasRatingFilter) {
+          const rating = feature.properties[currentMetric];
+          // Handle null/undefined ratings
+          if (rating === null || rating === undefined) return false;
+          if (rating < minRating || rating > maxRating) return false;
+        }
+        
+        // Bedroom filter
+        if (hasBedroomFilter) {
+          const bedroom = feature.properties.bedroom;
+          // Skip if bedroom is null, undefined, or 0 (no bedroom data)
+          if (bedroom === null || bedroom === undefined || bedroom === 0) return false;
+          
+          const bedroomCount = bedroom;
+          
+          if (bedroomFilter === '6+') {
+            if (bedroomCount < 6) return false;
+          } else {
+            const targetBedrooms = parseInt(bedroomFilter);
+            if (bedroomCount !== targetBedrooms) return false;
+          }
+        }
+        
+        return true;
       });
 
       return {
@@ -1404,7 +1501,8 @@ module.exports = function (context, readonly) {
                   communication: listing.communication,
                   location: listing.location,
                   value: listing.value,
-                  reviewsCount: listing.reviewsCount
+                  reviewsCount: listing.reviewsCount,
+                  bedroom: listing.bedroom,
                 }
                 });
               }
@@ -1611,6 +1709,13 @@ module.exports = function (context, readonly) {
             ? `${totalReview > 0 ? '+' : ''}${totalReview} reviews`
             : `${totalReview} reviews`;
 
+          const bedroomCount = feature.properties.bedroom;
+          const bedroomLabel = bedroomCount === null || bedroomCount === undefined || bedroomCount === 0
+            ? 'N/A'
+            : bedroomCount >= 6
+            ? '6+ Bedrooms'
+            : `${bedroomCount} Bedroom${bedroomCount > 1 ? 's' : ''}`;
+
           tooltip.innerHTML = `
             <div style="font-size: 16px; font-weight: bold; color: #333; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px; overflow-wrap: break-word;">
               ${listingName}
@@ -1640,6 +1745,11 @@ module.exports = function (context, readonly) {
               <div style="display: contents;">
                 <div style="font-weight: 500; display: flex; align-items: center; gap: 4px;">🏡 Type</div>
                 <div>${propertyType}</div>
+              </div>
+              
+              <div style="display: contents;">
+                <div style="font-weight: 500; display: flex; align-items: center; gap: 4px;">🛏️ Bedrooms</div>
+                <div>${bedroomLabel}</div>
               </div>
               
               <div style="display: contents;">
