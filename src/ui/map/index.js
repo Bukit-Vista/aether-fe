@@ -116,18 +116,18 @@ module.exports = function (context, readonly) {
             // Optimize: reduce redundant parseFloat + toFixed operations
             const dataLength = data.length;
             const compressed = new Array(dataLength);
-            
+
             for (let i = 0; i < dataLength; i++) {
               const item = data[i];
               compressed[i] = {
-              id: item.id,
+                id: item.id,
                 longitude: Math.round(item.longitude * 100000) / 100000,
                 latitude: Math.round(item.latitude * 100000) / 100000,
-              listing_name: item.listing_name,
-              reviewsCount: item.reviewsCount || 0,
-              area_name: item.area_name || '',
-              roomTypeCategory: item.roomTypeCategory || '',
-              rate: item.rate || 0,
+                listing_name: item.listing_name,
+                reviewsCount: item.reviewsCount || 0,
+                area_name: item.area_name || '',
+                roomTypeCategory: item.roomTypeCategory || '',
+                rate: item.rate || 0,
                 review: Math.round((item.review || 0) * 10) / 10,
                 accuracy: Math.round((item.accuracy || 0) * 10) / 10,
                 checkin: Math.round((item.checkin || 0) * 10) / 10,
@@ -137,7 +137,7 @@ module.exports = function (context, readonly) {
                 value: Math.round((item.value || 0) * 10) / 10
               };
             }
-            
+
             return compressed;
           } catch (error) {
             console.warn('Failed to compress data:', error);
@@ -255,7 +255,7 @@ module.exports = function (context, readonly) {
           try {
             const now = Date.now();
             const maxAgeMs = 24 * 3600000; // 24 hours
-            
+
             // Clear expired memory cache
             const memCacheKeys = Object.keys(airbnbDataStorage.memoryCache);
             for (let i = 0; i < memCacheKeys.length; i++) {
@@ -270,7 +270,10 @@ module.exports = function (context, readonly) {
             const localStorageKeys = Object.keys(localStorage);
             for (let i = 0; i < localStorageKeys.length; i++) {
               const key = localStorageKeys[i];
-              if (key.startsWith('airbnb_data_') && key.endsWith('_timestamp')) {
+              if (
+                key.startsWith('airbnb_data_') &&
+                key.endsWith('_timestamp')
+              ) {
                 const timestamp = parseInt(localStorage.getItem(key));
                 if (now - timestamp > maxAgeMs) {
                   const dataKey = key.slice(0, -10); // Remove '_timestamp' suffix
@@ -315,12 +318,12 @@ module.exports = function (context, readonly) {
     const getPolygonCoordinates = (longitude, latitude) => {
       // Create cache key with current offset
       const cacheKey = `${longitude}_${latitude}_${offsetValue}`;
-      
+
       // Check cache first
       if (polygonCache.has(cacheKey)) {
         return polygonCache.get(cacheKey);
       }
-      
+
       const coordinates = [
         [
           [longitude - offsetValue, latitude - offsetValue],
@@ -330,12 +333,12 @@ module.exports = function (context, readonly) {
           [longitude - offsetValue, latitude - offsetValue]
         ]
       ];
-      
+
       // Cache management: clear if too large
       if (polygonCache.size >= POLYGON_CACHE_MAX_SIZE) {
         polygonCache.clear();
       }
-      
+
       polygonCache.set(cacheKey, coordinates);
       return coordinates;
     };
@@ -357,10 +360,10 @@ module.exports = function (context, readonly) {
 
     const titleContainer = document.createElement('div');
     titleContainer.style.cssText = `
-      margin-bottom: 12px;
+      margin-bottom: 8px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       font-weight: 600;
-      font-size: 14px;
+      font-size: 13px;
       color: #333;
     `;
     titleContainer.textContent = 'Filter Metrics';
@@ -401,7 +404,7 @@ module.exports = function (context, readonly) {
 
     const metricSelect = document.createElement('select');
     metricSelect.style.cssText = `
-      width: 180px;
+      width: 100%;
       padding: 8px 12px;
       border-radius: 8px;
       border: 1px solid #e0e0e0;
@@ -412,6 +415,7 @@ module.exports = function (context, readonly) {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       transition: all 0.2s ease;
       outline: none;
+      box-sizing: border-box;
       &:hover {
         border-color: #ccc;
         background: #f2f2f2;
@@ -443,8 +447,617 @@ module.exports = function (context, readonly) {
     });
 
     metricFilterContainer.appendChild(toggleButton);
-    metricFilterContainer.appendChild(titleContainer);
-    metricFilterContainer.appendChild(metricSelect);
+
+    // Filter Mode Toggle (Default / Internal)
+    const filterModeContainer = document.createElement('div');
+    filterModeContainer.style.cssText = `
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #e0e0e0;
+      width: 100%;
+    `;
+
+    const filterModeTitle = document.createElement('div');
+    filterModeTitle.style.cssText = `
+      margin-bottom: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-weight: 600;
+      font-size: 13px;
+      color: #333;
+    `;
+    filterModeTitle.textContent = 'Filter Mode';
+
+    // Toggle Button Container
+    const toggleButtonContainer = document.createElement('div');
+    toggleButtonContainer.style.cssText = `
+      display: flex;
+      background: #e0e0e0;
+      border-radius: 8px;
+      padding: 3px;
+      width: fit-content;
+      position: relative;
+    `;
+
+    const defaultModeButton = document.createElement('button');
+    defaultModeButton.textContent = '🌐 Default';
+    defaultModeButton.style.cssText = `
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      background: #2196F3;
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      min-width: 85px;
+    `;
+
+    const internalModeButton = document.createElement('button');
+    internalModeButton.textContent = '🏢 Internal';
+    internalModeButton.style.cssText = `
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      background: transparent;
+      color: #666;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      transition: all 0.3s ease;
+      min-width: 85px;
+    `;
+
+    toggleButtonContainer.appendChild(defaultModeButton);
+    toggleButtonContainer.appendChild(internalModeButton);
+
+    const switchToMode = async (newMode) => {
+      if (filterMode === newMode) return; // Already in this mode
+
+      // Abort any ongoing fetch operations
+      if (currentFetchController) {
+        currentFetchController.abort();
+        console.log('Aborted fetch operation due to mode change');
+      }
+
+      // Update mode
+      filterMode = newMode;
+
+      if (filterMode === 'internal') {
+        // Update button styles
+        defaultModeButton.style.background = 'transparent';
+        defaultModeButton.style.color = '#666';
+        defaultModeButton.style.boxShadow = 'none';
+        internalModeButton.style.background = '#FF9800';
+        internalModeButton.style.color = 'white';
+        internalModeButton.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+
+        // Update container border
+        filterModeContainer.style.borderBottom = '2px solid #FF9800';
+
+        // Hide info message
+        filterModeInfo.style.display = 'none';
+
+        // Hide default filters, show internal filters
+        defaultFiltersContainer.style.display = 'none';
+        internalFiltersContainer.style.display = 'block';
+
+        // Save current default mode data to cache before switching
+        if (airbnbDataStorage.geojsonData.features.length > 0) {
+          console.log(
+            'Saving default mode data to cache:',
+            airbnbDataStorage.geojsonData.features.length,
+            'features'
+          );
+          defaultModeCache.features = [
+            ...airbnbDataStorage.geojsonData.features
+          ];
+          defaultModeCache.renderedIds = new Set(airbnbDataStorage.renderedIds);
+          defaultModeCache.lastUpdate = Date.now();
+        }
+
+        // Clear all existing data
+        airbnbDataStorage.geojsonData.features = [];
+        airbnbDataStorage.renderedIds.clear();
+
+        // Clear the 3D chart layer
+        if (context.map.getSource('3d-chart-data')) {
+          context.map.getSource('3d-chart-data').setData({
+            type: 'FeatureCollection',
+            features: []
+          });
+        }
+
+        console.log('Switched to Internal mode');
+
+        // Hide loading if it's showing
+        hideLoading();
+        isFetching = false;
+
+        // Lazy load staff groups on first switch to internal mode
+        if (!staffGroupsLoaded) {
+          await fetchStaffGroups();
+          staffGroupsLoaded = true;
+
+          // Auto-load first group after groups are loaded
+          if (availableHousekeeperGroups.length > 0) {
+            const firstGroupId = availableHousekeeperGroups[0].id;
+            staffGroupsSelect.value = firstGroupId;
+            selectedStaffGroup = firstGroupId;
+            await fetchStaffGroupProperties(firstGroupId);
+          }
+        } else {
+          // Groups already loaded
+          if (availableHousekeeperGroups.length > 0) {
+            // If there's a previously selected group, restore it
+            if (selectedStaffGroup) {
+              staffGroupsSelect.value = selectedStaffGroup;
+              await fetchStaffGroupProperties(selectedStaffGroup);
+            } else {
+              // Otherwise, load first group
+              const firstGroupId = availableHousekeeperGroups[0].id;
+              staffGroupsSelect.value = firstGroupId;
+              selectedStaffGroup = firstGroupId;
+              await fetchStaffGroupProperties(firstGroupId);
+            }
+          }
+        }
+      } else {
+        // Update button styles
+        defaultModeButton.style.background = '#2196F3';
+        defaultModeButton.style.color = 'white';
+        defaultModeButton.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+        internalModeButton.style.background = 'transparent';
+        internalModeButton.style.color = '#666';
+        internalModeButton.style.boxShadow = 'none';
+
+        // Update container border
+        filterModeContainer.style.borderBottom = '2px solid #e0e0e0';
+
+        // Hide info message
+        filterModeInfo.style.display = 'none';
+
+        // Show default filters, hide internal filters
+        defaultFiltersContainer.style.display = 'block';
+        internalFiltersContainer.style.display = 'none';
+
+        // Clear internal property cache to free memory
+        internalPropertyCache.clear();
+
+        // Check if we have cached default mode data
+        const cacheAge = Date.now() - (defaultModeCache.lastUpdate || 0);
+        const cacheMaxAge = 5 * 60 * 1000; // 5 minutes
+
+        if (defaultModeCache.features.length > 0 && cacheAge < cacheMaxAge) {
+          // Restore from cache
+          console.log(
+            'Restoring default mode data from cache:',
+            defaultModeCache.features.length,
+            'features'
+          );
+
+          airbnbDataStorage.geojsonData.features = [
+            ...defaultModeCache.features
+          ];
+          airbnbDataStorage.renderedIds = new Set(defaultModeCache.renderedIds);
+
+          // Update the 3D chart immediately
+          setup3DChart(getFilteredGeojson());
+        } else {
+          // Cache expired or empty, fetch fresh data
+          console.log('Cache expired or empty, fetching fresh data');
+
+          // Clear existing data first
+          airbnbDataStorage.geojsonData.features = [];
+          airbnbDataStorage.renderedIds.clear();
+
+          // Reload data
+          await getAllAirbnbData(
+            context.map.getCenter().lat,
+            context.map.getCenter().lng
+          );
+        }
+      }
+    };
+
+    // Add hover effects
+    defaultModeButton.addEventListener('mouseenter', function () {
+      if (filterMode !== 'default') {
+        this.style.background = '#f5f5f5';
+      }
+    });
+    defaultModeButton.addEventListener('mouseleave', function () {
+      if (filterMode !== 'default') {
+        this.style.background = 'transparent';
+      }
+    });
+
+    internalModeButton.addEventListener('mouseenter', function () {
+      if (filterMode !== 'internal') {
+        this.style.background = '#f5f5f5';
+      }
+    });
+    internalModeButton.addEventListener('mouseleave', function () {
+      if (filterMode !== 'internal') {
+        this.style.background = 'transparent';
+      }
+    });
+
+    defaultModeButton.addEventListener('click', () => switchToMode('default'));
+    internalModeButton.addEventListener('click', () =>
+      switchToMode('internal')
+    );
+
+    // Info message for current mode (hidden)
+    const filterModeInfo = document.createElement('div');
+    filterModeInfo.style.cssText = `
+      margin-top: 8px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #E3F2FD;
+      color: #1565C0;
+      line-height: 1.4;
+      display: none;
+    `;
+    filterModeInfo.id = 'filter-mode-info';
+
+    filterModeContainer.appendChild(filterModeTitle);
+    filterModeContainer.appendChild(toggleButtonContainer);
+    filterModeContainer.appendChild(filterModeInfo);
+    metricFilterContainer.appendChild(filterModeContainer);
+
+    // Default Filters Container (existing filters)
+    const defaultFiltersContainer = document.createElement('div');
+    defaultFiltersContainer.id = 'default-filters-container';
+    defaultFiltersContainer.style.cssText = `
+      display: block;
+      width: 180px;
+    `;
+
+    // Internal Filters Container (staff groups filter)
+    const internalFiltersContainer = document.createElement('div');
+    internalFiltersContainer.id = 'internal-filters-container';
+    internalFiltersContainer.style.cssText = `
+      display: none;
+      width: 180px;
+    `;
+
+    // Add title and metric select to default filters
+    defaultFiltersContainer.appendChild(titleContainer);
+    defaultFiltersContainer.appendChild(metricSelect);
+
+    // Staff Groups Filter for Internal Mode
+    const staffGroupsContainer = document.createElement('div');
+    staffGroupsContainer.style.cssText = `
+      width: 180px;
+    `;
+
+    const staffGroupsTitle = document.createElement('div');
+    staffGroupsTitle.style.cssText = `
+      margin-bottom: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-weight: 600;
+      font-size: 13px;
+      color: #333;
+    `;
+    staffGroupsTitle.textContent = 'Housekeeper Group';
+
+    const staffGroupsSelect = document.createElement('select');
+    staffGroupsSelect.style.cssText = `
+      width: 100%;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+      font-size: 14px;
+      cursor: pointer;
+      background: #f8f8f8;
+      color: #333;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      transition: all 0.2s ease;
+      outline: none;
+      box-sizing: border-box;
+      &:hover {
+        border-color: #ccc;
+        background: #f2f2f2;
+      }
+      &:focus {
+        border-color: #FF9800;
+        box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.1);
+      }
+    `;
+
+    // Add loading option
+    const loadingOption = document.createElement('option');
+    loadingOption.textContent = 'Loading...';
+    staffGroupsSelect.appendChild(loadingOption);
+
+    // Store available housekeeper groups for later use
+    let availableHousekeeperGroups = [];
+
+    // Cache for internal mode property data
+    const internalPropertyCache = new Map();
+    const INTERNAL_CACHE_MAX_SIZE = 20; // Store max 20 groups in cache
+
+    // Cache for default mode data
+    let defaultModeCache = {
+      features: [],
+      renderedIds: new Set(),
+      lastUpdate: null
+    };
+
+    // Fetch housekeeper groups from API
+    async function fetchStaffGroups() {
+      try {
+        const response = await fetch(
+          'http://127.0.0.1:8000/housekeeper-group-listing',
+          {
+            method: 'GET',
+            headers: {
+              token:
+                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNWU0OTMyNzZhNDBjOGYzYTE3NTc4NWU0IiwidXNlcl9lbWFpbCI6InZpZGkuYnVraXR2aXN0YUBnbWFpbC5jb20iLCJ1c2VyX3N0YXR1cyI6MSwidXNlcl90eXBlIjoiZW1wbG95ZWUiLCJpYXQiOjE3NTkzMDc1OTd9.mT6yDd3Is_74okVtx4XkFiE4mxULGyAvlCPEl914GPs',
+              user_id: '5e493276a40c8f3a175785e4'
+            }
+          }
+        );
+
+        const result = await response.json();
+
+        if (result.success && result.data) {
+          // Store available groups
+          availableHousekeeperGroups = result.data;
+
+          // Clear loading option
+          staffGroupsSelect.innerHTML = '';
+
+          // Add groups to dropdown
+          result.data.forEach((group) => {
+            const option = document.createElement('option');
+            option.value = group.id;
+            option.textContent = group.name;
+            option.dataset.properties = JSON.stringify(group.properties);
+            staffGroupsSelect.appendChild(option);
+          });
+
+          console.log('Housekeeper groups loaded:', result.data.length);
+        } else {
+          console.error('Failed to load housekeeper groups:', result);
+          staffGroupsSelect.innerHTML = '';
+          const errorOption = document.createElement('option');
+          errorOption.textContent = 'Failed to load groups';
+          staffGroupsSelect.appendChild(errorOption);
+        }
+      } catch (error) {
+        console.error('Error fetching housekeeper groups:', error);
+        staffGroupsSelect.innerHTML = '';
+        const errorOption = document.createElement('option');
+        errorOption.textContent = 'Error loading groups';
+        staffGroupsSelect.appendChild(errorOption);
+      }
+    }
+
+    // Lazy load: fetch staff groups only when needed
+    let staffGroupsLoaded = false;
+
+    // Fetch properties for selected housekeeper group
+    async function fetchStaffGroupProperties(groupId) {
+      try {
+        // Check cache first
+        if (internalPropertyCache.has(groupId)) {
+          console.log('Using cached data for group:', groupId);
+          const cachedFeatures = internalPropertyCache.get(groupId);
+
+          // Update the GeoJSON data
+          airbnbDataStorage.geojsonData.features = cachedFeatures;
+
+          // Track rendered IDs
+          airbnbDataStorage.renderedIds.clear();
+          const featuresLength = cachedFeatures.length;
+          for (let i = 0; i < featuresLength; i++) {
+            const propertyId = cachedFeatures[i].properties.property_id;
+            if (propertyId) {
+              airbnbDataStorage.renderedIds.add(propertyId);
+            }
+          }
+
+          // Update the 3D chart
+          setup3DChart(getFilteredGeojson());
+          return;
+        }
+
+        showLoading();
+
+        // Find the selected group from available groups
+        const selectedGroup = availableHousekeeperGroups.find(
+          (g) => g.id === parseInt(groupId)
+        );
+
+        if (!selectedGroup) {
+          console.log('Group not found:', groupId);
+          hideLoading();
+          return;
+        }
+
+        const propertyCodes = selectedGroup.properties;
+
+        if (!propertyCodes || propertyCodes.length === 0) {
+          console.log('No properties in this group');
+          hideLoading();
+          return;
+        }
+
+        console.log(
+          `Fetching ${propertyCodes.length} properties for ${selectedGroup.name}`
+        );
+
+        // Fetch property details using the property codes
+        const propertyCodesParam = propertyCodes.join(',');
+        const response = await fetch(
+          `http://127.0.0.1:8000/property-details?id=${encodeURIComponent(
+            propertyCodesParam
+          )}`,
+          {
+            method: 'GET',
+            headers: {
+              token:
+                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNWU0OTMyNzZhNDBjOGYzYTE3NTc4NWU0IiwidXNlcl9lbWFpbCI6InZpZGkuYnVraXR2aXN0YUBnbWFpbC5jb20iLCJ1c2VyX3N0YXR1cyI6MSwidXNlcl90eXBlIjoiZW1wbG95ZWUiLCJpYXQiOjE3NTkzMDc1OTd9.mT6yDd3Is_74okVtx4XkFiE4mxULGyAvlCPEl914GPs',
+              user_id: '5e493276a40c8f3a175785e4'
+            }
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        if (result.success && result.data && result.data.length > 0) {
+          console.log('Properties loaded:', result.data.length);
+
+          // Optimized transform properties data into GeoJSON features
+          const features = [];
+          const dataLength = result.data.length;
+
+          for (let i = 0; i < dataLength; i++) {
+            const property = result.data[i];
+
+            // Skip properties without valid coordinates
+            if (
+              property.lat === null ||
+              property.lng === null ||
+              property.lat === undefined ||
+              property.lng === undefined
+            ) {
+              continue;
+            }
+
+            features.push({
+              type: 'Feature',
+              geometry: {
+                type: 'Polygon',
+                coordinates: getPolygonCoordinates(
+                  parseFloat(property.lng),
+                  parseFloat(property.lat)
+                )
+              },
+              properties: {
+                listing_name: property.property_name || 'Unknown Property',
+                airbnbUrl: property.airbnb_url || property.listing_url || '#',
+                height: 250,
+                area_name:
+                  property.area ||
+                  property.city ||
+                  property.area_name ||
+                  'Unknown Area',
+                roomTypeCategory:
+                  property.property_type ||
+                  property.roomTypeCategory ||
+                  'Property',
+                rate: property.rate || 0,
+                review: 5.0,
+                accuracy: 5.0,
+                checkin: 5.0,
+                cleanliness: 5.0,
+                communication: 5.0,
+                location: 5.0,
+                value: 5.0,
+                reviewsCount: 250,
+                bedroom:
+                  property.bedroom_count ||
+                  property.bedrooms ||
+                  property.bedroom ||
+                  0,
+                property_id:
+                  property.id || property.property_id || property.property_code
+              }
+            });
+          }
+
+          console.log(
+            `Processed ${features.length} properties with valid coordinates`
+          );
+
+          // Cache management: clear oldest if cache is full
+          if (internalPropertyCache.size >= INTERNAL_CACHE_MAX_SIZE) {
+            const firstKey = internalPropertyCache.keys().next().value;
+            internalPropertyCache.delete(firstKey);
+          }
+
+          // Store in cache
+          internalPropertyCache.set(groupId, features);
+
+          // Update the GeoJSON data
+          airbnbDataStorage.geojsonData.features = features;
+
+          // Track rendered IDs
+          airbnbDataStorage.renderedIds.clear();
+          const featuresLength = features.length;
+          for (let i = 0; i < featuresLength; i++) {
+            const propertyId = features[i].properties.property_id;
+            if (propertyId) {
+              airbnbDataStorage.renderedIds.add(propertyId);
+            }
+          }
+
+          // Update the 3D chart
+          setup3DChart(getFilteredGeojson());
+
+          if (features.length === 0) {
+            console.log(
+              'No properties with valid coordinates found for group:',
+              selectedGroup.name
+            );
+          }
+        } else {
+          console.log('No properties found for group:', selectedGroup.name);
+        }
+      } catch (error) {
+        console.error('Error fetching housekeeper group properties:', error);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    let staffGroupChangeTimer = null;
+
+    staffGroupsSelect.addEventListener('change', (e) => {
+      selectedStaffGroup = e.target.value;
+      console.log('Selected housekeeper group:', selectedStaffGroup);
+
+      // Clear existing data immediately for better UX
+      airbnbDataStorage.geojsonData.features = [];
+      airbnbDataStorage.renderedIds.clear();
+
+      if (context.map.getSource('3d-chart-data')) {
+        context.map.getSource('3d-chart-data').setData({
+          type: 'FeatureCollection',
+          features: []
+        });
+      }
+
+      // Debounce fetching to avoid multiple rapid calls
+      if (staffGroupChangeTimer) {
+        clearTimeout(staffGroupChangeTimer);
+      }
+
+      staffGroupChangeTimer = setTimeout(async () => {
+        await fetchStaffGroupProperties(selectedStaffGroup);
+      }, 150); // 150ms debounce
+    });
+
+    staffGroupsContainer.appendChild(staffGroupsTitle);
+    staffGroupsContainer.appendChild(staffGroupsSelect);
+    internalFiltersContainer.appendChild(staffGroupsContainer);
+
+    // Add both filter containers to main container
+    metricFilterContainer.appendChild(defaultFiltersContainer);
+    metricFilterContainer.appendChild(internalFiltersContainer);
+
     document.getElementById('map').appendChild(metricFilterContainer);
 
     let currentMetric = 'review';
@@ -456,6 +1069,11 @@ module.exports = function (context, readonly) {
     let maxRating = 5; // Maximum rating filter
     let ratingFilterDebounceTimer = null; // Debounce timer for rating filter
     let bedroomFilter = 'all'; // Bedroom filter: 'all', '1', '2', '3', '4', '5', '6+'
+    let minReviewCount = 0; // Minimum review count filter
+    let maxReviewCount = 10000; // Maximum review count filter
+    let reviewCountFilterDebounceTimer = null; // Debounce timer for review count filter
+    let filterMode = 'default'; // Filter mode: 'default' or 'internal'
+    let selectedStaffGroup = 'all'; // Selected staff group for internal mode
 
     metricSelect.addEventListener('change', (e) => {
       currentMetric = e.target.value;
@@ -471,7 +1089,6 @@ module.exports = function (context, readonly) {
       margin-top: 12px;
       border-top: 1px solid #e0e0e0;
       padding-top: 12px;
-      width: 100%;
     `;
 
     const reviewModeTitle = document.createElement('div');
@@ -486,7 +1103,7 @@ module.exports = function (context, readonly) {
 
     const reviewModeSelect = document.createElement('select');
     reviewModeSelect.style.cssText = `
-      width: 180px;
+      width: 100%;
       padding: 8px 12px;
       border-radius: 8px;
       border: 1px solid #e0e0e0;
@@ -497,6 +1114,7 @@ module.exports = function (context, readonly) {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       transition: all 0.2s ease;
       outline: none;
+      box-sizing: border-box;
       &:hover {
         border-color: #ccc;
         background: #f2f2f2;
@@ -525,20 +1143,20 @@ module.exports = function (context, readonly) {
 
     reviewModeSelect.addEventListener('change', async (e) => {
       const newMode = e.target.value;
-      
+
       // Abort any ongoing fetch operations
       if (currentFetchController) {
         currentFetchController.abort();
         console.log('Aborted previous fetch operation');
       }
-      
+
       // Update mode
       reviewsCountMode = newMode;
-      
+
       // Clear existing data
       airbnbDataStorage.geojsonData.features = [];
       airbnbDataStorage.renderedIds.clear();
-      
+
       // Clear the 3D chart layer immediately to prevent mixing old data
       if (context.map.getSource('3d-chart-data')) {
         context.map.getSource('3d-chart-data').setData({
@@ -546,23 +1164,23 @@ module.exports = function (context, readonly) {
           features: []
         });
       }
-      
+
       // Add small delay to ensure cleanup completes
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Only proceed if mode hasn't changed again during delay
-      if (reviewsCountMode === newMode) {
-      // Reload data with new mode
-      await getAllAirbnbData(
-        context.map.getCenter().lat,
-        context.map.getCenter().lng
-      );
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Only proceed if mode hasn't changed again during delay and not in internal mode
+      if (reviewsCountMode === newMode && filterMode === 'default') {
+        // Reload data with new mode
+        await getAllAirbnbData(
+          context.map.getCenter().lat,
+          context.map.getCenter().lng
+        );
       }
     });
 
     reviewModeContainer.appendChild(reviewModeTitle);
     reviewModeContainer.appendChild(reviewModeSelect);
-    metricFilterContainer.appendChild(reviewModeContainer);
+    defaultFiltersContainer.appendChild(reviewModeContainer);
 
     // Rating Range Filter
     const ratingRangeContainer = document.createElement('div');
@@ -585,15 +1203,15 @@ module.exports = function (context, readonly) {
 
     const ratingInputsContainer = document.createElement('div');
     ratingInputsContainer.style.cssText = `
-      display: flex;
-      gap: 12px;
-      align-items: center;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      align-items: end;
     `;
 
     // Min Rating Input
     const minRatingContainer = document.createElement('div');
     minRatingContainer.style.cssText = `
-      flex: 1;
       display: flex;
       flex-direction: column;
       gap: 4px;
@@ -602,7 +1220,7 @@ module.exports = function (context, readonly) {
     const minRatingLabel = document.createElement('label');
     minRatingLabel.textContent = 'Min';
     minRatingLabel.style.cssText = `
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 500;
       color: #666;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -614,11 +1232,12 @@ module.exports = function (context, readonly) {
     minRatingInput.max = '5';
     minRatingInput.step = '0.1';
     minRatingInput.value = '0';
+    minRatingInput.required = true;
     minRatingInput.style.cssText = `
-      padding: 8px 10px;
+      padding: 6px 8px;
       border-radius: 6px;
       border: 1px solid #e0e0e0;
-      font-size: 14px;
+      font-size: 13px;
       background: #f8f8f8;
       color: #333;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -639,7 +1258,6 @@ module.exports = function (context, readonly) {
     // Max Rating Input
     const maxRatingContainer = document.createElement('div');
     maxRatingContainer.style.cssText = `
-      flex: 1;
       display: flex;
       flex-direction: column;
       gap: 4px;
@@ -648,7 +1266,7 @@ module.exports = function (context, readonly) {
     const maxRatingLabel = document.createElement('label');
     maxRatingLabel.textContent = 'Max';
     maxRatingLabel.style.cssText = `
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 500;
       color: #666;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -660,11 +1278,12 @@ module.exports = function (context, readonly) {
     maxRatingInput.max = '5';
     maxRatingInput.step = '0.1';
     maxRatingInput.value = '5';
+    maxRatingInput.required = true;
     maxRatingInput.style.cssText = `
-      padding: 8px 10px;
+      padding: 6px 8px;
       border-radius: 6px;
       border: 1px solid #e0e0e0;
-      font-size: 14px;
+      font-size: 13px;
       background: #f8f8f8;
       color: #333;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -689,18 +1308,32 @@ module.exports = function (context, readonly) {
       }
 
       ratingFilterDebounceTimer = setTimeout(() => {
+        // Ensure values are never empty
+        if (minRatingInput.value === '' || minRatingInput.value === null) {
+          minRatingInput.value = '0';
+        }
+        if (maxRatingInput.value === '' || maxRatingInput.value === null) {
+          maxRatingInput.value = '5';
+        }
+
         const minVal = parseFloat(minRatingInput.value);
         const maxVal = parseFloat(maxRatingInput.value);
 
-        // Validate inputs
-        if (minVal > maxVal) {
+        // Validate inputs - check for NaN
+        if (isNaN(minVal)) {
+          minRatingInput.value = '0';
+          minRating = 0;
+        } else if (minVal > maxVal) {
           minRatingInput.value = maxVal;
           minRating = maxVal;
         } else {
           minRating = minVal;
         }
 
-        if (maxVal < minVal) {
+        if (isNaN(maxVal)) {
+          maxRatingInput.value = '5';
+          maxRating = 5;
+        } else if (maxVal < minVal) {
           maxRatingInput.value = minVal;
           maxRating = minVal;
         } else {
@@ -721,6 +1354,21 @@ module.exports = function (context, readonly) {
     minRatingInput.addEventListener('input', handleRatingFilterChange);
     maxRatingInput.addEventListener('input', handleRatingFilterChange);
 
+    // Prevent empty values on blur
+    minRatingInput.addEventListener('blur', () => {
+      if (minRatingInput.value === '' || minRatingInput.value === null) {
+        minRatingInput.value = '0';
+        handleRatingFilterChange();
+      }
+    });
+
+    maxRatingInput.addEventListener('blur', () => {
+      if (maxRatingInput.value === '' || maxRatingInput.value === null) {
+        maxRatingInput.value = '5';
+        handleRatingFilterChange();
+      }
+    });
+
     // Assemble min rating container
     minRatingContainer.appendChild(minRatingLabel);
     minRatingContainer.appendChild(minRatingInput);
@@ -736,7 +1384,7 @@ module.exports = function (context, readonly) {
     // Assemble rating range container
     ratingRangeContainer.appendChild(ratingRangeTitle);
     ratingRangeContainer.appendChild(ratingInputsContainer);
-    metricFilterContainer.appendChild(ratingRangeContainer);
+    defaultFiltersContainer.appendChild(ratingRangeContainer);
 
     // Bedroom Filter
     const bedroomFilterContainer = document.createElement('div');
@@ -744,7 +1392,6 @@ module.exports = function (context, readonly) {
       margin-top: 12px;
       border-top: 1px solid #e0e0e0;
       padding-top: 12px;
-      width: 100%;
     `;
 
     const bedroomFilterTitle = document.createElement('div');
@@ -759,7 +1406,7 @@ module.exports = function (context, readonly) {
 
     const bedroomSelect = document.createElement('select');
     bedroomSelect.style.cssText = `
-      width: 180px;
+      width: 100%;
       padding: 8px 12px;
       border-radius: 8px;
       border: 1px solid #e0e0e0;
@@ -770,6 +1417,7 @@ module.exports = function (context, readonly) {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       transition: all 0.2s ease;
       outline: none;
+      box-sizing: border-box;
       &:hover {
         border-color: #ccc;
         background: #f2f2f2;
@@ -807,7 +1455,229 @@ module.exports = function (context, readonly) {
 
     bedroomFilterContainer.appendChild(bedroomFilterTitle);
     bedroomFilterContainer.appendChild(bedroomSelect);
-    metricFilterContainer.appendChild(bedroomFilterContainer);
+    defaultFiltersContainer.appendChild(bedroomFilterContainer);
+
+    // Review Count Range Filter
+    const reviewCountRangeContainer = document.createElement('div');
+    reviewCountRangeContainer.style.cssText = `
+      margin-top: 12px;
+      border-top: 1px solid #e0e0e0;
+      padding-top: 12px;
+      width: 100%;
+    `;
+
+    const reviewCountRangeTitle = document.createElement('div');
+    reviewCountRangeTitle.style.cssText = `
+      margin-bottom: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-weight: 600;
+      font-size: 13px;
+      color: #333;
+    `;
+    reviewCountRangeTitle.textContent = 'Review Count Range';
+
+    const reviewCountInputsContainer = document.createElement('div');
+    reviewCountInputsContainer.style.cssText = `
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      align-items: end;
+    `;
+
+    // Min Review Count Input
+    const minReviewCountContainer = document.createElement('div');
+    minReviewCountContainer.style.cssText = `
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    `;
+
+    const minReviewCountLabel = document.createElement('label');
+    minReviewCountLabel.textContent = 'Min';
+    minReviewCountLabel.style.cssText = `
+      font-size: 11px;
+      font-weight: 500;
+      color: #666;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    `;
+
+    const minReviewCountInput = document.createElement('input');
+    minReviewCountInput.type = 'number';
+    minReviewCountInput.min = '0';
+    minReviewCountInput.max = '10000';
+    minReviewCountInput.step = '1';
+    minReviewCountInput.value = '0';
+    minReviewCountInput.required = true;
+    minReviewCountInput.style.cssText = `
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid #e0e0e0;
+      font-size: 13px;
+      background: #f8f8f8;
+      color: #333;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      transition: all 0.2s ease;
+      outline: none;
+      width: 100%;
+      &:hover {
+        border-color: #ccc;
+        background: #f2f2f2;
+      }
+      &:focus {
+        border-color: #2196F3;
+        background: white;
+        box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+      }
+    `;
+
+    // Max Review Count Input
+    const maxReviewCountContainer = document.createElement('div');
+    maxReviewCountContainer.style.cssText = `
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    `;
+
+    const maxReviewCountLabel = document.createElement('label');
+    maxReviewCountLabel.textContent = 'Max';
+    maxReviewCountLabel.style.cssText = `
+      font-size: 11px;
+      font-weight: 500;
+      color: #666;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    `;
+
+    const maxReviewCountInput = document.createElement('input');
+    maxReviewCountInput.type = 'number';
+    maxReviewCountInput.min = '0';
+    maxReviewCountInput.max = '10000';
+    maxReviewCountInput.step = '1';
+    maxReviewCountInput.value = '10000';
+    maxReviewCountInput.required = true;
+    maxReviewCountInput.style.cssText = `
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid #e0e0e0;
+      font-size: 13px;
+      background: #f8f8f8;
+      color: #333;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      transition: all 0.2s ease;
+      outline: none;
+      width: 100%;
+      &:hover {
+        border-color: #ccc;
+        background: #f2f2f2;
+      }
+      &:focus {
+        border-color: #2196F3;
+        background: white;
+        box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+      }
+    `;
+
+    // Add event listeners for review count filter
+    const handleReviewCountFilterChange = () => {
+      if (reviewCountFilterDebounceTimer) {
+        clearTimeout(reviewCountFilterDebounceTimer);
+      }
+
+      reviewCountFilterDebounceTimer = setTimeout(() => {
+        // Ensure values are never empty
+        if (
+          minReviewCountInput.value === '' ||
+          minReviewCountInput.value === null
+        ) {
+          minReviewCountInput.value = '0';
+        }
+        if (
+          maxReviewCountInput.value === '' ||
+          maxReviewCountInput.value === null
+        ) {
+          maxReviewCountInput.value = '10000';
+        }
+
+        const minVal = parseInt(minReviewCountInput.value);
+        const maxVal = parseInt(maxReviewCountInput.value);
+
+        // Validate inputs - check for NaN
+        if (isNaN(minVal)) {
+          minReviewCountInput.value = '0';
+          minReviewCount = 0;
+        } else if (minVal > maxVal) {
+          minReviewCountInput.value = maxVal;
+          minReviewCount = maxVal;
+        } else {
+          minReviewCount = minVal;
+        }
+
+        if (isNaN(maxVal)) {
+          maxReviewCountInput.value = '10000';
+          maxReviewCount = 10000;
+        } else if (maxVal < minVal) {
+          maxReviewCountInput.value = minVal;
+          maxReviewCount = minVal;
+        } else {
+          maxReviewCount = maxVal;
+        }
+
+        // Ensure values are within bounds
+        minReviewCount = Math.max(0, minReviewCount);
+        maxReviewCount = Math.max(0, maxReviewCount);
+
+        minReviewCountInput.value = minReviewCount;
+        maxReviewCountInput.value = maxReviewCount;
+
+        applyRatingFilter();
+      }, 300); // 300ms debounce for smooth input
+    };
+
+    minReviewCountInput.addEventListener(
+      'input',
+      handleReviewCountFilterChange
+    );
+    maxReviewCountInput.addEventListener(
+      'input',
+      handleReviewCountFilterChange
+    );
+
+    // Prevent empty values on blur
+    minReviewCountInput.addEventListener('blur', () => {
+      if (
+        minReviewCountInput.value === '' ||
+        minReviewCountInput.value === null
+      ) {
+        minReviewCountInput.value = '0';
+        handleReviewCountFilterChange();
+      }
+    });
+
+    maxReviewCountInput.addEventListener('blur', () => {
+      if (
+        maxReviewCountInput.value === '' ||
+        maxReviewCountInput.value === null
+      ) {
+        maxReviewCountInput.value = '10000';
+        handleReviewCountFilterChange();
+      }
+    });
+
+    // Assemble min review count container
+    minReviewCountContainer.appendChild(minReviewCountLabel);
+    minReviewCountContainer.appendChild(minReviewCountInput);
+
+    // Assemble max review count container
+    maxReviewCountContainer.appendChild(maxReviewCountLabel);
+    maxReviewCountContainer.appendChild(maxReviewCountInput);
+
+    // Assemble inputs container
+    reviewCountInputsContainer.appendChild(minReviewCountContainer);
+    reviewCountInputsContainer.appendChild(maxReviewCountContainer);
+
+    // Assemble review count range container
+    reviewCountRangeContainer.appendChild(reviewCountRangeTitle);
+    reviewCountRangeContainer.appendChild(reviewCountInputsContainer);
+    defaultFiltersContainer.appendChild(reviewCountRangeContainer);
 
     const sliderContainer = document.createElement('div');
     sliderContainer.style.cssText = `
@@ -854,11 +1724,11 @@ module.exports = function (context, readonly) {
     `;
 
     let sliderDebounceTimer = null;
-    
+
     offsetSlider.addEventListener('input', (e) => {
       offsetValue = parseFloat(e.target.value);
       sliderLabel.textContent = getPolygonSizeLabel(offsetValue);
-      
+
       // Clear polygon cache when offset changes
       polygonCache.clear();
 
@@ -870,23 +1740,23 @@ module.exports = function (context, readonly) {
       sliderDebounceTimer = setTimeout(() => {
         if (airbnbDataStorage.geojsonData.features.length > 0) {
           const featuresLength = airbnbDataStorage.geojsonData.features.length;
-          
+
           // Optimize: directly modify features instead of creating new array
           for (let i = 0; i < featuresLength; i++) {
             const feature = airbnbDataStorage.geojsonData.features[i];
             const coordinates = feature.geometry.coordinates[0];
-            
+
             if (coordinates && coordinates.length > 0) {
               // Optimized center calculation
               let sumLng = 0;
               let sumLat = 0;
               const coordLength = coordinates.length;
-              
+
               for (let j = 0; j < coordLength; j++) {
                 sumLng += coordinates[j][0];
                 sumLat += coordinates[j][1];
               }
-              
+
               const centerLng = sumLng / coordLength;
               const centerLat = sumLat / coordLength;
 
@@ -908,7 +1778,7 @@ module.exports = function (context, readonly) {
 
     sliderContainer.appendChild(sliderLabel);
     sliderContainer.appendChild(offsetSlider);
-    metricFilterContainer.appendChild(sliderContainer);
+    defaultFiltersContainer.appendChild(sliderContainer);
 
     function updateChartColors() {
       if (context.map.getLayer('3d-chart-layer')) {
@@ -928,26 +1798,31 @@ module.exports = function (context, readonly) {
 
     // Helper function to get filtered geojson - ALWAYS use this instead of raw data
     function getFilteredGeojson() {
-      if (!airbnbDataStorage.geojsonData.features || airbnbDataStorage.geojsonData.features.length === 0) {
+      if (
+        !airbnbDataStorage.geojsonData.features ||
+        airbnbDataStorage.geojsonData.features.length === 0
+      ) {
         return {
           type: 'FeatureCollection',
           features: []
         };
       }
 
-      // Filter features based on current metric, rating range, and bedroom count
+      // Filter features based on current metric, rating range, bedroom count, and review count
       const allFeatures = airbnbDataStorage.geojsonData.features;
-      
+
       // Check if any filter is applied
       const hasRatingFilter = minRating !== 0 || maxRating !== 5;
       const hasBedroomFilter = bedroomFilter !== 'all';
-      
+      const hasReviewCountFilter =
+        minReviewCount !== 0 || maxReviewCount !== 10000;
+
       // If no filter is applied (default values), return all features for better performance
-      if (!hasRatingFilter && !hasBedroomFilter) {
+      if (!hasRatingFilter && !hasBedroomFilter && !hasReviewCountFilter) {
         return airbnbDataStorage.geojsonData;
       }
-      
-      const filteredFeatures = allFeatures.filter(feature => {
+
+      const filteredFeatures = allFeatures.filter((feature) => {
         // Rating filter
         if (hasRatingFilter) {
           const rating = feature.properties[currentMetric];
@@ -955,15 +1830,16 @@ module.exports = function (context, readonly) {
           if (rating === null || rating === undefined) return false;
           if (rating < minRating || rating > maxRating) return false;
         }
-        
+
         // Bedroom filter
         if (hasBedroomFilter) {
           const bedroom = feature.properties.bedroom;
           // Skip if bedroom is null, undefined, or 0 (no bedroom data)
-          if (bedroom === null || bedroom === undefined || bedroom === 0) return false;
-          
+          if (bedroom === null || bedroom === undefined || bedroom === 0)
+            return false;
+
           const bedroomCount = bedroom;
-          
+
           if (bedroomFilter === '6+') {
             if (bedroomCount < 6) return false;
           } else {
@@ -971,7 +1847,16 @@ module.exports = function (context, readonly) {
             if (bedroomCount !== targetBedrooms) return false;
           }
         }
-        
+
+        // Review count filter
+        if (hasReviewCountFilter) {
+          const reviewCount = feature.properties.reviewsCount;
+          // Handle null/undefined review counts
+          if (reviewCount === null || reviewCount === undefined) return false;
+          if (reviewCount < minReviewCount || reviewCount > maxReviewCount)
+            return false;
+        }
+
         return true;
       });
 
@@ -1344,7 +2229,12 @@ module.exports = function (context, readonly) {
       loadingBar.style.opacity = '0';
     };
 
-    async function getAirbnbData(lat = null, lng = null, skip_index = 0, modeAtFetchStart = null) {
+    async function getAirbnbData(
+      lat = null,
+      lng = null,
+      skip_index = 0,
+      modeAtFetchStart = null
+    ) {
       try {
         showLoading();
 
@@ -1364,7 +2254,9 @@ module.exports = function (context, readonly) {
             console.log(`Using cached data for ${cacheKey}`);
             // Validate mode hasn't changed
             if (modeAtFetchStart && reviewsCountMode !== modeAtFetchStart) {
-              console.log(`Mode changed from ${modeAtFetchStart} to ${reviewsCountMode}, discarding cached data`);
+              console.log(
+                `Mode changed from ${modeAtFetchStart} to ${reviewsCountMode}, discarding cached data`
+              );
               return [];
             }
             return cachedData;
@@ -1372,7 +2264,7 @@ module.exports = function (context, readonly) {
         }
 
         let url = `${process.env.API_BASE_URL}/airbnb-listings?limit=${limit}&lat=${lat}&lng=${lng}&skip=${skip}`;
-        
+
         // Add reviews_count_mode parameter if not current (default)
         if (reviewsCountMode !== 'current') {
           url += `&reviews_count_mode=${reviewsCountMode}`;
@@ -1391,10 +2283,12 @@ module.exports = function (context, readonly) {
         }
 
         const data = await response.json();
-        
+
         // Validate mode hasn't changed before saving/returning data
         if (modeAtFetchStart && reviewsCountMode !== modeAtFetchStart) {
-          console.log(`Mode changed from ${modeAtFetchStart} to ${reviewsCountMode}, discarding fetched data`);
+          console.log(
+            `Mode changed from ${modeAtFetchStart} to ${reviewsCountMode}, discarding fetched data`
+          );
           return [];
         }
 
@@ -1418,31 +2312,37 @@ module.exports = function (context, readonly) {
     }
 
     async function getAllAirbnbData(lat = null, lng = null) {
+      // Don't fetch data if in internal mode
+      if (filterMode === 'internal') {
+        console.log('Skipping data fetch - in Internal mode');
+        return [];
+      }
+
       // Create new AbortController for this fetch operation
       currentFetchController = new AbortController();
       const modeAtStart = reviewsCountMode; // Capture mode at start of fetch
       isFetching = true;
-      
+
       // Always ensure we start with clean data structure
       // Setup chart with current data (could be empty when switching modes)
-        setup3DChart(getFilteredGeojson());
+      setup3DChart(getFilteredGeojson());
 
       let hasNewData = false;
 
       try {
-      for (let skip_index = 0; skip_index <= 5; skip_index++) {
+        for (let skip_index = 0; skip_index <= 5; skip_index++) {
           // Check if mode changed before each batch
           if (reviewsCountMode !== modeAtStart) {
             console.log(`Mode changed during fetch, stopping data load`);
             isFetching = false;
             return [];
           }
-          
+
           const data = await getAirbnbData(lat, lng, skip_index, modeAtStart);
 
-        if (!data || data.length === 0) {
-          continue;
-        }
+          if (!data || data.length === 0) {
+            continue;
+          }
 
           // Double check mode hasn't changed after fetch completes
           if (reviewsCountMode !== modeAtStart) {
@@ -1451,81 +2351,93 @@ module.exports = function (context, readonly) {
             return [];
           }
 
-        const newListings = data.filter(
-          (listing) => !airbnbDataStorage.renderedIds.has(listing.id)
-        );
+          const newListings = data.filter(
+            (listing) => !airbnbDataStorage.renderedIds.has(listing.id)
+          );
 
-        if (newListings.length > 0) {
-          hasNewData = true;
+          if (newListings.length > 0) {
+            hasNewData = true;
 
-          const batchSize = 500;
+            const batchSize = 500;
             const featuresArray = airbnbDataStorage.geojsonData.features;
             let shouldUpdateChart = false;
-            
-          for (let i = 0; i < newListings.length; i += batchSize) {
+
+            for (let i = 0; i < newListings.length; i += batchSize) {
               // Check mode before processing each batch
               if (reviewsCountMode !== modeAtStart) {
                 console.log(`Mode changed during batch processing, stopping`);
                 isFetching = false;
                 return [];
               }
-              
-            const batch = newListings.slice(i, i + batchSize);
+
+              const batch = newListings.slice(i, i + batchSize);
               const batchLength = batch.length;
 
               // Pre-allocate and directly push for better performance
               for (let j = 0; j < batchLength; j++) {
                 const listing = batch[j];
-              airbnbDataStorage.renderedIds.add(listing.id);
+                airbnbDataStorage.renderedIds.add(listing.id);
 
                 featuresArray.push({
-                type: 'Feature',
-                geometry: {
-                  type: 'Polygon',
-                  coordinates: getPolygonCoordinates(
-                    listing.longitude,
-                    listing.latitude
-                  )
-                },
-                properties: {
-                  listing_name: listing.listing_name,
+                  type: 'Feature',
+                  geometry: {
+                    type: 'Polygon',
+                    coordinates: getPolygonCoordinates(
+                      listing.longitude,
+                      listing.latitude
+                    )
+                  },
+                  properties: {
+                    listing_name: listing.listing_name,
                     airbnbUrl: `https://www.airbnb.com/rooms/${listing.id}`,
-                  height: listing.reviewsCount,
-                  area_name: listing.area_name,
-                  roomTypeCategory: listing.roomTypeCategory,
-                  rate: listing.rate,
-                  review: listing.review,
-                  accuracy: listing.accuracy,
-                  checkin: listing.checkin,
-                  cleanliness: listing.cleanliness,
-                  communication: listing.communication,
-                  location: listing.location,
-                  value: listing.value,
-                  reviewsCount: listing.reviewsCount,
-                  bedroom: listing.bedroom,
-                }
+                    height: listing.reviewsCount,
+                    area_name: listing.area_name,
+                    roomTypeCategory: listing.roomTypeCategory,
+                    rate: listing.rate,
+                    review: listing.review,
+                    accuracy: listing.accuracy,
+                    checkin: listing.checkin,
+                    cleanliness: listing.cleanliness,
+                    communication: listing.communication,
+                    location: listing.location,
+                    value: listing.value,
+                    reviewsCount: listing.reviewsCount,
+                    bedroom: listing.bedroom
+                  }
                 });
               }
 
               // Only update chart for intermediate batches, not every time
-            if (i + batchSize < newListings.length) {
-              setup3DChart(getFilteredGeojson());
-              await new Promise((resolve) => setTimeout(resolve, 0));
+              if (i + batchSize < newListings.length) {
+                setup3DChart(getFilteredGeojson());
+                await new Promise((resolve) => setTimeout(resolve, 0));
               } else {
                 shouldUpdateChart = true;
+              }
             }
-          }
 
             // Final update after all batches processed
             if (shouldUpdateChart) {
-          setup3DChart(getFilteredGeojson());
-        }
+              setup3DChart(getFilteredGeojson());
+            }
           }
         }
       } catch (error) {
         console.error('Error in getAllAirbnbData:', error);
       } finally {
         isFetching = false;
+
+        // Update cache if in default mode and has data
+        if (
+          filterMode === 'default' &&
+          airbnbDataStorage.geojsonData.features.length > 0
+        ) {
+          defaultModeCache.features = [
+            ...airbnbDataStorage.geojsonData.features
+          ];
+          defaultModeCache.renderedIds = new Set(airbnbDataStorage.renderedIds);
+          defaultModeCache.lastUpdate = Date.now();
+        }
       }
 
       return airbnbDataStorage.geojsonData.features;
@@ -1703,18 +2615,24 @@ module.exports = function (context, readonly) {
           const reviewModeOption = reviewModeOptions.find(
             (opt) => opt.value === reviewsCountMode
           );
-          const reviewModeLabel = reviewModeOption ? reviewModeOption.label : reviewsCountMode;
-          
-          const reviewCountLabel = reviewsCountMode === 'difference' 
-            ? `${totalReview > 0 ? '+' : ''}${totalReview} reviews`
-            : `${totalReview} reviews`;
+          const reviewModeLabel = reviewModeOption
+            ? reviewModeOption.label
+            : reviewsCountMode;
+
+          const reviewCountLabel =
+            reviewsCountMode === 'difference'
+              ? `${totalReview > 0 ? '+' : ''}${totalReview} reviews`
+              : `${totalReview} reviews`;
 
           const bedroomCount = feature.properties.bedroom;
-          const bedroomLabel = bedroomCount === null || bedroomCount === undefined || bedroomCount === 0
-            ? 'N/A'
-            : bedroomCount >= 6
-            ? '6+ Bedrooms'
-            : `${bedroomCount} Bedroom${bedroomCount > 1 ? 's' : ''}`;
+          const bedroomLabel =
+            bedroomCount === null ||
+            bedroomCount === undefined ||
+            bedroomCount === 0
+              ? 'N/A'
+              : bedroomCount >= 6
+              ? '6+ Bedrooms'
+              : `${bedroomCount} Bedroom${bedroomCount > 1 ? 's' : ''}`;
 
           tooltip.innerHTML = `
             <div style="font-size: 16px; font-weight: bold; color: #333; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px; overflow-wrap: break-word;">
@@ -1724,7 +2642,9 @@ module.exports = function (context, readonly) {
               
               <div style="display: contents;">
                 <div style="font-weight: 500; display: flex; align-items: center; gap: 4px;">⭐ ${metricLabel}</div>
-                <div style="white-space: nowrap;">${selectedRating.toFixed(1)}</div>
+                <div style="white-space: nowrap;">${selectedRating.toFixed(
+                  1
+                )}</div>
               </div>
               
               <div style="display: contents;">
@@ -1853,24 +2773,30 @@ module.exports = function (context, readonly) {
       if (moveendDebounceTimer) {
         clearTimeout(moveendDebounceTimer);
       }
-      
-      moveendDebounceTimer = setTimeout(async () => {
-      const zoom = context.map.getZoom();
-      const center = context.map.getCenter();
 
-      if (zoom > 10) {
+      moveendDebounceTimer = setTimeout(async () => {
+        // Don't fetch if in internal mode
+        if (filterMode === 'internal') {
+          console.log('Skipping map moveend fetch - in Internal mode');
+          return;
+        }
+
+        const zoom = context.map.getZoom();
+        const center = context.map.getCenter();
+
+        if (zoom > 10) {
           // Abort any ongoing fetch before starting new one
           if (currentFetchController && isFetching) {
             currentFetchController.abort();
             console.log('Aborted fetch due to map movement');
           }
-          
+
           isFetching = true;
-        await getAllAirbnbData(center.lat, center.lng);
+          await getAllAirbnbData(center.lat, center.lng);
           isFetching = false;
-      } else {
-        console.log('Zoom level too low for data fetching:', zoom);
-      }
+        } else {
+          console.log('Zoom level too low for data fetching:', zoom);
+        }
       }, 300); // 300ms debounce delay
     });
   }
