@@ -26,23 +26,97 @@
 }
 
 .marker-properties td {
+  padding: 4px;
+  border-bottom: 1px solid #eee;
+}
+
+.marker-properties td:first-child {
+  width: 40%;
+  font-weight: bold;
+}
+
+.marker-properties td:last-child {
   width: 60%;
 }
 
-.marker-properties.display td,
-.marker-properties.display th {
-  padding: 5px 10px;
+.marker-properties input {
+  width: 100%;
+  padding: 4px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
 }
 
-.marker-properties tr:last-child td,
-.marker-properties tr:last-child th {
-  border-bottom: none;
+.marker-properties input:focus {
+  outline: none;
+  border-color: #0078ff;
 }
 
-.marker-properties tr:nth-child(even) th,
-.marker-properties tr:nth-child(even) td,
-.metadata tr:nth-child(even) td {
-  background-color: #f7f7f7;
+.marker-info {
+  padding: 8px;
+  font-size: 12px;
+  color: #666;
+}
+
+.add-row-button {
+  margin-top: 8px;
+  padding: 4px 8px;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.add-row-button:hover {
+  background: #eee;
+}
+
+.add-simplestyle-properties-button {
+  margin-top: 8px;
+  padding: 4px 8px;
+  color: #0078ff;
+  cursor: pointer;
+}
+
+.add-simplestyle-properties-button:hover {
+  text-decoration: underline;
+}
+
+.save {
+  background: #0078ff;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.save:hover {
+  background: #0066cc;
+}
+
+.cancel {
+  background: #f5f5f5;
+  color: #666;
+  border: 1px solid #ddd;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.cancel:hover {
+  background: #eee;
+}
+
+.delete-invert {
+  background: none;
+  border: none;
+  color: #ff4444;
+  cursor: pointer;
+  padding: 8px 16px;
+}
+
+.delete-invert:hover {
+  text-decoration: underline;
 }
 
 .geojsonio-feature .mapboxgl-popup-content {
@@ -66,6 +140,7 @@ datalist {
 .tabs-ui {
   position: relative;
   width: 250px;
+  display: none;
 }
 
 .tabs-ui > * {
@@ -100,17 +175,6 @@ datalist {
 .tab [type='radio']:checked ~ label ~ .content {
   z-index: 1;
   display: block;
-}
-
-.add-row-button,
-.add-simplestyle-properties-button {
-  color: #2980b9;
-}
-
-.add-row-button:hover,
-.add-simplestyle-properties-button:hover {
-  cursor: pointer;
-  color: #199cf4;
 }
 
 .foo {
