@@ -1064,6 +1064,9 @@ module.exports = function (context, readonly) {
     let reviewsCountMode = 'march2026'; // default mode
     let compareFrom = 'may2025';
     let compareTo = 'march2026';
+
+    // Per-mode feature cache: stores complete features + renderedIds so switching modes is instant
+    const modeFeatureCache = new Map();
     let currentFetchController = null; // Track ongoing fetch operations
     let isFetching = false; // Track if currently fetching
     let moveendDebounceTimer = null; // Debounce timer for map movement
@@ -1229,14 +1232,53 @@ module.exports = function (context, readonly) {
       return true;
     }
 
-    async function reloadDataWithCurrentMode() {
+    function getModeCacheKey(mode, from, to) {
+      return mode === 'difference' ? `difference_${from}_${to}` : mode;
+    }
+
+    function saveCurrentModeToCache(prevMode, prevFrom, prevTo) {
+      if (airbnbDataStorage.geojsonData.features.length > 0) {
+        const key = getModeCacheKey(prevMode, prevFrom, prevTo);
+        modeFeatureCache.set(key, {
+          features: [...airbnbDataStorage.geojsonData.features],
+          renderedIds: new Set(airbnbDataStorage.renderedIds),
+          timestamp: Date.now()
+        });
+        console.log(`Saved ${airbnbDataStorage.geojsonData.features.length} features to mode cache [${key}]`);
+      }
+    }
+
+    function restoreFromModeCache(mode, from, to) {
+      const key = getModeCacheKey(mode, from, to);
+      const cached = modeFeatureCache.get(key);
+      if (cached && Date.now() - cached.timestamp < 3600000) {
+        airbnbDataStorage.geojsonData.features = [...cached.features];
+        airbnbDataStorage.renderedIds = new Set(cached.renderedIds);
+        console.log(`Restored ${cached.features.length} features from mode cache [${key}]`);
+        return true;
+      }
+      return false;
+    }
+
+    async function reloadDataWithCurrentMode(prevMode, prevFrom, prevTo) {
       if (currentFetchController) {
         currentFetchController.abort();
         console.log('Aborted previous fetch operation');
       }
 
+      // Save previous mode data before clearing
+      if (prevMode) {
+        saveCurrentModeToCache(prevMode, prevFrom, prevTo);
+      }
+
       airbnbDataStorage.geojsonData.features = [];
       airbnbDataStorage.renderedIds.clear();
+
+      // Try restoring from cache first
+      if (restoreFromModeCache(reviewsCountMode, compareFrom, compareTo)) {
+        setup3DChart(getFilteredGeojson());
+        return;
+      }
 
       if (context.map.getSource('3d-chart-data')) {
         context.map.getSource('3d-chart-data').setData({
@@ -1256,6 +1298,9 @@ module.exports = function (context, readonly) {
     }
 
     reviewModeSelect.addEventListener('change', async (e) => {
+      const prevMode = reviewsCountMode;
+      const prevFrom = compareFrom;
+      const prevTo = compareTo;
       const newMode = e.target.value;
       reviewsCountMode = newMode;
       toggleComparisonUI(newMode === 'difference');
@@ -1264,25 +1309,77 @@ module.exports = function (context, readonly) {
         if (!validateComparison()) return;
       }
 
-      await reloadDataWithCurrentMode();
+      await reloadDataWithCurrentMode(prevMode, prevFrom, prevTo);
     });
 
     compareFromSelect.addEventListener('change', async (e) => {
+      const prevFrom = compareFrom;
       compareFrom = e.target.value;
       if (!validateComparison()) return;
-      await reloadDataWithCurrentMode();
+      await reloadDataWithCurrentMode('difference', prevFrom, compareTo);
     });
 
     compareToSelect.addEventListener('change', async (e) => {
+      const prevTo = compareTo;
       compareTo = e.target.value;
       if (!validateComparison()) return;
-      await reloadDataWithCurrentMode();
+      await reloadDataWithCurrentMode('difference', compareFrom, prevTo);
     });
 
     reviewModeContainer.appendChild(reviewModeTitle);
     reviewModeContainer.appendChild(reviewModeSelect);
     reviewModeContainer.appendChild(comparisonContainer);
     defaultFiltersContainer.appendChild(reviewModeContainer);
+
+    // Collapsible Advanced Filters
+    const advancedToggle = document.createElement('div');
+    advancedToggle.style.cssText = `
+      margin-top: 12px;
+      border-top: 1px solid #e0e0e0;
+      padding-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+    `;
+
+    const advancedLabel = document.createElement('div');
+    advancedLabel.style.cssText = `
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-weight: 600;
+      font-size: 13px;
+      color: #333;
+    `;
+    advancedLabel.textContent = 'Advanced Filters';
+
+    const advancedArrow = document.createElement('span');
+    advancedArrow.style.cssText = `
+      font-size: 12px;
+      color: #888;
+      transition: transform 0.2s ease;
+      display: inline-block;
+    `;
+    advancedArrow.textContent = '\u25BC';
+
+    advancedToggle.appendChild(advancedLabel);
+    advancedToggle.appendChild(advancedArrow);
+
+    const advancedContent = document.createElement('div');
+    advancedContent.style.cssText = `
+      display: none;
+      flex-direction: column;
+    `;
+
+    let advancedOpen = false;
+    advancedToggle.addEventListener('click', () => {
+      advancedOpen = !advancedOpen;
+      advancedContent.style.display = advancedOpen ? 'flex' : 'none';
+      advancedArrow.style.transform = advancedOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+    });
+
+    defaultFiltersContainer.appendChild(advancedToggle);
+    defaultFiltersContainer.appendChild(advancedContent);
 
     // Rating Range Filter
     const ratingRangeContainer = document.createElement('div');
@@ -1486,7 +1583,7 @@ module.exports = function (context, readonly) {
     // Assemble rating range container
     ratingRangeContainer.appendChild(ratingRangeTitle);
     ratingRangeContainer.appendChild(ratingInputsContainer);
-    defaultFiltersContainer.appendChild(ratingRangeContainer);
+    advancedContent.appendChild(ratingRangeContainer);
 
     // Bedroom Filter
     const bedroomFilterContainer = document.createElement('div');
@@ -1557,7 +1654,7 @@ module.exports = function (context, readonly) {
 
     bedroomFilterContainer.appendChild(bedroomFilterTitle);
     bedroomFilterContainer.appendChild(bedroomSelect);
-    defaultFiltersContainer.appendChild(bedroomFilterContainer);
+    advancedContent.appendChild(bedroomFilterContainer);
 
     // Review Count Range Filter
     const reviewCountRangeContainer = document.createElement('div');
@@ -1779,7 +1876,7 @@ module.exports = function (context, readonly) {
     // Assemble review count range container
     reviewCountRangeContainer.appendChild(reviewCountRangeTitle);
     reviewCountRangeContainer.appendChild(reviewCountInputsContainer);
-    defaultFiltersContainer.appendChild(reviewCountRangeContainer);
+    advancedContent.appendChild(reviewCountRangeContainer);
 
     const sliderContainer = document.createElement('div');
     sliderContainer.style.cssText = `
@@ -1919,16 +2016,26 @@ module.exports = function (context, readonly) {
       const hasReviewCountFilter =
         minReviewCount !== 0 || maxReviewCount !== 10000;
 
-      // If no filter is applied (default values), return all features for better performance
+      // Always filter out listings with reviews > 0 but rating 0 (renders as black bars)
+      const excludeZeroRating = (feature) => {
+        const rating = feature.properties.review;
+        const reviewsCount = feature.properties.reviewsCount;
+        return !(reviewsCount > 0 && (rating === 0 || rating === null || rating === undefined));
+      };
+
       if (!hasRatingFilter && !hasBedroomFilter && !hasReviewCountFilter) {
-        return airbnbDataStorage.geojsonData;
+        return {
+          type: 'FeatureCollection',
+          features: allFeatures.filter(excludeZeroRating)
+        };
       }
 
       const filteredFeatures = allFeatures.filter((feature) => {
+        if (!excludeZeroRating(feature)) return false;
+
         // Rating filter
         if (hasRatingFilter) {
           const rating = feature.properties[currentMetric];
-          // Handle null/undefined ratings
           if (rating === null || rating === undefined) return false;
           if (rating < minRating || rating > maxRating) return false;
         }
@@ -2546,6 +2653,8 @@ module.exports = function (context, readonly) {
           ];
           defaultModeCache.renderedIds = new Set(airbnbDataStorage.renderedIds);
           defaultModeCache.lastUpdate = Date.now();
+
+          saveCurrentModeToCache(reviewsCountMode, compareFrom, compareTo);
         }
       }
 
