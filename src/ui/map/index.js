@@ -794,7 +794,7 @@ module.exports = function (context, readonly) {
     async function fetchStaffGroups() {
       try {
         const response = await fetch(
-          'http://127.0.0.1:8000/housekeeper-group-listing',
+          `${process.env.API_BASE_URL}/housekeeper-group-listing`,
           {
             method: 'GET',
             headers: {
@@ -897,7 +897,7 @@ module.exports = function (context, readonly) {
         // Fetch property details using the property codes
         const propertyCodesParam = propertyCodes.join(',');
         const response = await fetch(
-          `http://127.0.0.1:8000/property-details?id=${encodeURIComponent(
+          `${process.env.API_BASE_URL}/property-details?id=${encodeURIComponent(
             propertyCodesParam
           )}`,
           {
@@ -1061,7 +1061,9 @@ module.exports = function (context, readonly) {
     document.getElementById('map').appendChild(metricFilterContainer);
 
     let currentMetric = 'review';
-    let reviewsCountMode = 'current'; // default mode
+    let reviewsCountMode = 'march2026'; // default mode
+    let compareFrom = 'may2025';
+    let compareTo = 'march2026';
     let currentFetchController = null; // Track ongoing fetch operations
     let isFetching = false; // Track if currently fetching
     let moveendDebounceTimer = null; // Debounce timer for map movement
@@ -1126,38 +1128,116 @@ module.exports = function (context, readonly) {
     `;
 
     const reviewModeOptions = [
-      { value: 'current', label: 'October 2025 Dataset' },
-      { value: 'previous', label: 'May 2025 Dataset' },
-      { value: 'difference', label: 'Review Difference' }
+      { value: 'may2025', label: 'May 2025' },
+      { value: 'october2025', label: 'October 2025' },
+      { value: 'march2026', label: 'March 2026' },
+      { value: 'difference', label: 'Difference' }
+    ];
+
+    const periodOptions = [
+      { value: 'may2025', label: 'May 2025' },
+      { value: 'october2025', label: 'October 2025' },
+      { value: 'march2026', label: 'March 2026' }
     ];
 
     reviewModeOptions.forEach((option) => {
       const optionElement = document.createElement('option');
       optionElement.value = option.value;
       optionElement.textContent = option.label;
+      if (option.value === 'march2026') optionElement.selected = true;
       optionElement.style.cssText = `
         padding: 8px;
       `;
       reviewModeSelect.appendChild(optionElement);
     });
 
-    reviewModeSelect.addEventListener('change', async (e) => {
-      const newMode = e.target.value;
+    // Dynamic comparison container (shown only when mode = difference)
+    const comparisonContainer = document.createElement('div');
+    comparisonContainer.style.cssText = `
+      margin-top: 10px;
+      display: none;
+      gap: 8px;
+      flex-direction: column;
+    `;
 
-      // Abort any ongoing fetch operations
+    const comparisonSelectStyle = `
+      width: 100%;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+      font-size: 13px;
+      cursor: pointer;
+      background: #f8f8f8;
+      color: #333;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      transition: all 0.2s ease;
+      outline: none;
+      box-sizing: border-box;
+    `;
+
+    // Compare From
+    const compareFromLabel = document.createElement('div');
+    compareFromLabel.style.cssText = 'font-size: 12px; color: #666; margin-bottom: 4px; font-weight: 500;';
+    compareFromLabel.textContent = 'Compare From';
+
+    const compareFromSelect = document.createElement('select');
+    compareFromSelect.style.cssText = comparisonSelectStyle;
+    periodOptions.forEach((opt) => {
+      const el = document.createElement('option');
+      el.value = opt.value;
+      el.textContent = opt.label;
+      if (opt.value === compareFrom) el.selected = true;
+      compareFromSelect.appendChild(el);
+    });
+
+    // Compare To
+    const compareToLabel = document.createElement('div');
+    compareToLabel.style.cssText = 'font-size: 12px; color: #666; margin-bottom: 4px; margin-top: 6px; font-weight: 500;';
+    compareToLabel.textContent = 'Compare To';
+
+    const compareToSelect = document.createElement('select');
+    compareToSelect.style.cssText = comparisonSelectStyle;
+    periodOptions.forEach((opt) => {
+      const el = document.createElement('option');
+      el.value = opt.value;
+      el.textContent = opt.label;
+      if (opt.value === compareTo) el.selected = true;
+      compareToSelect.appendChild(el);
+    });
+
+    // Validation message element
+    const comparisonError = document.createElement('div');
+    comparisonError.style.cssText = 'font-size: 11px; color: #d32f2f; margin-top: 4px; display: none;';
+    comparisonError.textContent = 'Compare From and Compare To must be different.';
+
+    comparisonContainer.appendChild(compareFromLabel);
+    comparisonContainer.appendChild(compareFromSelect);
+    comparisonContainer.appendChild(compareToLabel);
+    comparisonContainer.appendChild(compareToSelect);
+    comparisonContainer.appendChild(comparisonError);
+
+    function toggleComparisonUI(show) {
+      comparisonContainer.style.display = show ? 'flex' : 'none';
+    }
+
+    function validateComparison() {
+      if (compareFrom === compareTo) {
+        comparisonError.style.display = 'block';
+        return false;
+      }
+      comparisonError.style.display = 'none';
+      return true;
+    }
+
+    async function reloadDataWithCurrentMode() {
       if (currentFetchController) {
         currentFetchController.abort();
         console.log('Aborted previous fetch operation');
       }
 
-      // Update mode
-      reviewsCountMode = newMode;
-
-      // Clear existing data
       airbnbDataStorage.geojsonData.features = [];
       airbnbDataStorage.renderedIds.clear();
 
-      // Clear the 3D chart layer immediately to prevent mixing old data
       if (context.map.getSource('3d-chart-data')) {
         context.map.getSource('3d-chart-data').setData({
           type: 'FeatureCollection',
@@ -1165,21 +1245,43 @@ module.exports = function (context, readonly) {
         });
       }
 
-      // Add small delay to ensure cleanup completes
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Only proceed if mode hasn't changed again during delay and not in internal mode
-      if (reviewsCountMode === newMode && filterMode === 'default') {
-        // Reload data with new mode
+      if (filterMode === 'default') {
         await getAllAirbnbData(
           context.map.getCenter().lat,
           context.map.getCenter().lng
         );
       }
+    }
+
+    reviewModeSelect.addEventListener('change', async (e) => {
+      const newMode = e.target.value;
+      reviewsCountMode = newMode;
+      toggleComparisonUI(newMode === 'difference');
+
+      if (newMode === 'difference') {
+        if (!validateComparison()) return;
+      }
+
+      await reloadDataWithCurrentMode();
+    });
+
+    compareFromSelect.addEventListener('change', async (e) => {
+      compareFrom = e.target.value;
+      if (!validateComparison()) return;
+      await reloadDataWithCurrentMode();
+    });
+
+    compareToSelect.addEventListener('change', async (e) => {
+      compareTo = e.target.value;
+      if (!validateComparison()) return;
+      await reloadDataWithCurrentMode();
     });
 
     reviewModeContainer.appendChild(reviewModeTitle);
     reviewModeContainer.appendChild(reviewModeSelect);
+    reviewModeContainer.appendChild(comparisonContainer);
     defaultFiltersContainer.appendChild(reviewModeContainer);
 
     // Rating Range Filter
@@ -2246,7 +2348,8 @@ module.exports = function (context, readonly) {
         // Optimize cache key generation - avoid conditional checks in template
         const latKey = lat ? lat.toFixed(precision) : 'null';
         const lngKey = lng ? lng.toFixed(precision) : 'null';
-        const cacheKey = `${latKey}_${lngKey}_${skip_index}_${reviewsCountMode}`;
+        const cacheKeySuffix = reviewsCountMode === 'difference' ? `${reviewsCountMode}_${compareFrom}_${compareTo}` : reviewsCountMode;
+        const cacheKey = `${latKey}_${lngKey}_${skip_index}_${cacheKeySuffix}`;
 
         if (airbnbDataStorage.cache.isCacheValid(cacheKey)) {
           const cachedData = airbnbDataStorage.cache.getFromCache(cacheKey);
@@ -2263,11 +2366,10 @@ module.exports = function (context, readonly) {
           }
         }
 
-        let url = `${process.env.API_BASE_URL}/airbnb-listings?limit=${limit}&lat=${lat}&lng=${lng}&skip=${skip}`;
+        let url = `${process.env.API_BASE_URL}/airbnb-listings?limit=${limit}&lat=${lat}&lng=${lng}&skip=${skip}&reviews_count_mode=${reviewsCountMode}`;
 
-        // Add reviews_count_mode parameter if not current (default)
-        if (reviewsCountMode !== 'current') {
-          url += `&reviews_count_mode=${reviewsCountMode}`;
+        if (reviewsCountMode === 'difference') {
+          url += `&compare_from=${compareFrom}&compare_to=${compareTo}`;
         }
 
         const response = await fetch(url, {
@@ -2279,6 +2381,13 @@ module.exports = function (context, readonly) {
         });
 
         if (!response.ok) {
+          if (response.status === 400) {
+            const errorBody = await response.json().catch(() => null);
+            const msg = errorBody?.message || errorBody?.error || 'Invalid filter parameters';
+            console.error(`Bad Request (400): ${msg}`);
+            alert(`Filter error: ${msg}`);
+            return [];
+          }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
@@ -2615,9 +2724,14 @@ module.exports = function (context, readonly) {
           const reviewModeOption = reviewModeOptions.find(
             (opt) => opt.value === reviewsCountMode
           );
-          const reviewModeLabel = reviewModeOption
-            ? reviewModeOption.label
-            : reviewsCountMode;
+          let reviewModeLabel;
+          if (reviewsCountMode === 'difference') {
+            const fromLabel = periodOptions.find((o) => o.value === compareFrom)?.label || compareFrom;
+            const toLabel = periodOptions.find((o) => o.value === compareTo)?.label || compareTo;
+            reviewModeLabel = `Growth: ${fromLabel} \u2192 ${toLabel}`;
+          } else {
+            reviewModeLabel = reviewModeOption ? reviewModeOption.label : reviewsCountMode;
+          }
 
           const reviewCountLabel =
             reviewsCountMode === 'difference'
