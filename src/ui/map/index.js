@@ -1061,9 +1061,9 @@ module.exports = function (context, readonly) {
     document.getElementById('map').appendChild(metricFilterContainer);
 
     let currentMetric = 'review';
-    let reviewsCountMode = 'march2026'; // default mode
+    let reviewsCountMode = 'august2026'; // default mode
     let compareFrom = 'may2025';
-    let compareTo = 'march2026';
+    let compareTo = 'august2026';
 
     // Per-mode feature cache: stores complete features + renderedIds so switching modes is instant
     const modeFeatureCache = new Map();
@@ -1134,20 +1134,22 @@ module.exports = function (context, readonly) {
       { value: 'may2025', label: 'May 2025' },
       { value: 'october2025', label: 'October 2025' },
       { value: 'march2026', label: 'March 2026' },
+      { value: 'august2026', label: 'August 2026' },
       { value: 'difference', label: 'Difference' }
     ];
 
     const periodOptions = [
       { value: 'may2025', label: 'May 2025' },
       { value: 'october2025', label: 'October 2025' },
-      { value: 'march2026', label: 'March 2026' }
+      { value: 'march2026', label: 'March 2026' },
+      { value: 'august2026', label: 'August 2026' }
     ];
 
     reviewModeOptions.forEach((option) => {
       const optionElement = document.createElement('option');
       optionElement.value = option.value;
       optionElement.textContent = option.label;
-      if (option.value === 'march2026') optionElement.selected = true;
+      if (option.value === 'august2026') optionElement.selected = true;
       optionElement.style.cssText = `
         padding: 8px;
       `;
